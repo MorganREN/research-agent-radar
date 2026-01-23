@@ -16,14 +16,15 @@ class RelevanceFilter:
         返回 {'is_relevant': bool, 'reason': str}
         """
         prompt = f"""
-        你是一个严谨的学术助手。请判断以下论文是否与我的研究兴趣高度相关。
+        你是一个严谨的学术助手。请判断以下论文是否在我的研究兴趣中。
         
-        我的研究兴趣: {self.interests}
+        我的研究兴趣包含了: {self.interests}
         
         论文标题: {title}
         论文摘要: {abstract}
         
-        请严格筛选。只有当论文明确涉及我的研究领域时才返回 True。
+        请严格筛选。只有当论文明确存在于我广泛的的研究领域，并且是我的研究兴趣之一时才返回 True。
+        请注意，我的各个研究兴趣之间的关系是OR，因此只要符合其中一个兴趣即可判定为相关。
         请以 JSON 格式返回结果，包含两个字段:
         - "is_relevant": true 或 false
         - "reason": 一句话解释原因

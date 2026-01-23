@@ -2,6 +2,7 @@ from sqlmodel import Session, select
 from src.research_agent.storage.models import Paper, create_db_and_tables, engine
 from src.research_agent.agents.scourt.arxiv_scout import ArxivScout
 from src.research_agent.agents.filter.triage_agent import RelevanceFilter
+from src.research_agent.acquisition.downloader import DownloadManager
 
 def run_ingestion_pipeline():
     # 1. 初始化数据库

@@ -14,6 +14,8 @@ class Paper(SQLModel, table=True):
     url: str
     published_date: datetime
     source: str = "arxiv"
+    is_oa: Optional[bool] = None  # 是否开放获取
+    doi: Optional[str] = None      # DOI 号，如果有的话
     
     # 系统状态 (Data Ingestion 核心字段)
     discovered_at: datetime = Field(default_factory=datetime.utcnow)

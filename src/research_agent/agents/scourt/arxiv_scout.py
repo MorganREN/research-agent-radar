@@ -32,7 +32,9 @@ class ArxivScout:
                 authors=[a.name for a in result.authors],
                 url=result.pdf_url,
                 published_date=result.published,
-                source="arxiv"
+                source="arxiv",
+                is_oa=True,  # arXiv 上的论文都是开放获取的
+                doi=result.doi if result.doi else None
             )
             papers_found.append(paper)
             

@@ -1,8 +1,10 @@
 from sqlmodel import Session, select
 from src.research_agent.storage.models import Paper, create_db_and_tables, engine
-from src.research_agent.agents.scourt.arxiv_scout import ArxivScout
+from src.research_agent.agents.scout.arxiv_scout import ArxivScout
+from src.research_agent.agents.scout.elsevier_scout import ElsevierScout
 from src.research_agent.agents.filter.triage_agent import RelevanceFilter
 from src.research_agent.acquisition.downloader import DownloadManager
+from loguru import logger
 
 def run_ingestion_pipeline():
     # 1. 初始化数据库
@@ -11,36 +13,58 @@ def run_ingestion_pipeline():
     # 2. 配置你的研究兴趣 (这是高度定制化的部分)
     # 结合了 AI 和 土木/隧道工程 [cite: 244]
     my_interests = """
-    1. 人工智能在土木工程中的应用，特别是深度学习。
-    2. 隧道工程的变形预测、结构健康监测。
-    3. 数字孪生技术在地下基础设施中的应用。
+    1. 人工智能在土木工程中的应用。
+    2. 隧道工程的变形预测、结构健康监测
+    3. 数字孪生技术
+    4. 人工智能
+    5. 大语言模型
+    6. 音乐生成
+    7. 视频生成模型和计算机视觉
     """
+
+    journals = [
+        # "Computer Networks",
+        # "Ad Hoc Networks",
+        "Tunnelling and Underground Space Technology",
+        "Automation in Construction"
+    ]
     
     # 3. 初始化 Agents
-    # 搜索 arXiv 的土木工程(cs.CE) 和 人工智能(cs.AI) 板块
-    scout = ArxivScout(query="cat:cs.CE OR cat:cs.AI", max_results=10)
+    # 3.1 搜索 arXiv 的土木工程(cs.CE) 和 人工智能(cs.AI) 板块
+    arxiv_scout = ArxivScout(query="cat:cs.CE OR cat:cs.AI", max_results=10)
+    # 3.2 搜索 Elsevier 的指定期刊
+    elsevier_scout = ElsevierScout(
+        journals=journals,
+        max_results=2,
+        year=2026
+    )
+
+    # 4. 初始化 Filter
     triage = RelevanceFilter(research_interests=my_interests)
     
-    # 4. 运行 Scout (侦察)
-    new_papers = scout.fetch_papers()
-    
+    # 5. 运行 Scout (侦察)
+    new_papers = []
+    new_papers += arxiv_scout.fetch_papers()
+    new_papers += elsevier_scout.fetch_papers()
+
+
     with Session(engine) as session:
         for paper in new_papers:
-            # 4.1 去重检查 (检查数据库是否已存在)
+            # 5.1 去重检查 (检查数据库是否已存在)
             existing_paper = session.get(Paper, paper.id)
             if existing_paper:
                 print(f"⏭️  跳过已存在的论文: {paper.id}")
                 continue
             
-            # 4.2 运行 Filter (筛选)
-            print(f"🧠 正在分析论文相关性: {paper.title[:50]}...")
+            # 5.2 运行 Filter (筛选)
+            logger.info(f"🧠 正在分析论文相关性: {paper.title[:50]}...")
             result = triage.check_relevance(paper.title, paper.abstract)
             
-            # 4.3 更新结果
+            # 5.3 更新结果
             paper.is_relevant = result['is_relevant']
             paper.relevance_reason = result['reason']
             
-            # 4.4 存入数据库
+            # 5.4 存入数据库
             session.add(paper)
             session.commit()
             

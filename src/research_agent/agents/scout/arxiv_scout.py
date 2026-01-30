@@ -26,7 +26,6 @@ class ArxivScout:
         papers_found = []
         for result in client.results(search):
             # 将 arXiv 原生对象转换为我们的数据库模型
-            logger.warning(f"Date: {result.published}, DATE TYPE: {type(result.published)}")
             paper = Paper(
                 id=f"arxiv:{result.entry_id.split('/')[-1]}", # 提取 ID 如 2401.12345
                 title=result.title,

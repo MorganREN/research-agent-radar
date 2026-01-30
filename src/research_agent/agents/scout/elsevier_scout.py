@@ -85,7 +85,6 @@ class ElsevierScout:
                 doi = item.get('prism:doi')
                 abstract, full_text_content = self._fetch_abstract_and_fulltext(doi)
                 date = dt.datetime.strptime(item.get('prism:coverDate'), "%Y-%m-%d")
-                logger.warning(f"Date: {date}, DATE TYPE: {type(date)}")
                 if abstract: 
                     access_paper_count += 1
                 else:
@@ -100,7 +99,8 @@ class ElsevierScout:
                     source=f"elsevier:{journal_name}",
                     is_oa=None,    # Elsevier 论文的开放获取状态需要额外判断
                     doi=item.get('prism:doi'),
-                    full_text_content=full_text_content
+                    full_text_content=full_text_content,
+                    download_status="downloaded"
                 )
                 papers.append(paper)
 

@@ -4,7 +4,9 @@ from src.research_agent.agents.scout.arxiv_scout import ArxivScout
 from src.research_agent.agents.scout.elsevier_scout import ElsevierScout
 from src.research_agent.agents.filter.triage_agent import RelevanceFilter
 from src.research_agent.acquisition.downloader import DownloadManager
+from src.research_agent.agents.analysis.reviewer import PaperReviewer
 from loguru import logger
+import asyncio
 
 def run_ingestion_pipeline():
     # 1. 初始化数据库
@@ -53,7 +55,7 @@ def run_ingestion_pipeline():
             # 5.1 去重检查 (检查数据库是否已存在)
             existing_paper = session.get(Paper, paper.id)
             if existing_paper:
-                print(f"⏭️  跳过已存在的论文: {paper.id}")
+                logger.info(f"⏭️  跳过已存在的论文: {paper.id}")
                 continue
             
             # 5.2 运行 Filter (筛选)
@@ -72,5 +74,55 @@ def run_ingestion_pipeline():
             print(f"{icon} [{paper.id}] 判定结果: {paper.is_relevant}")
             print(f"   理由: {paper.relevance_reason}\n")
 
+async def run_analysis_phase():
+    '''
+    Docstring for run_analysis_phase
+    '''
+    reviewer = PaperReviewer()
+    downloader = DownloadManager()
+
+    with Session(engine) as session:
+        # 1. 获取所有已下载且相关的论文
+        papers = session.exec(
+            select(Paper).where(
+                Paper.is_relevant == True,
+            )
+        ).all()
+
+        for paper in papers:
+            if paper.analysis_report:
+                logger.info(f"跳过已分析的论文: {paper.id}")
+                continue
+            logger.info(f"开始分析论文: {paper.id} ...")
+
+            # 2. 确认 PDF 已下载
+            save_path = f"data/papers/{paper.id}.pdf".replace(":", "_")
+            if paper.download_status != "downloaded":
+                status = await downloader.process_download(
+                    paper_id=paper.id,
+                    url=paper.url,
+                    source=paper.source
+                )
+                if status != "downloaded":
+                    logger.error(f"论文 {paper.id} 下载失败，跳过分析。")
+                    continue
+                paper.download_status = status
+                session.add(paper)
+                session.commit()
+
+            # 3. 运行分析
+            if paper.download_status == "downloaded":
+                if paper.source == "arxiv":
+                    report = reviewer.analyze_paper(paper, pdf_path=save_path)
+                else:
+                    report = reviewer.analyze_paper(paper, xml_content=paper.full_text_content)
+                paper.analysis_report = report
+                session.add(paper)
+                session.commit()
+                logger.success(f"论文 {paper.id} 分析完成。")
+
+
 if __name__ == "__main__":
     run_ingestion_pipeline()
+    
+    asyncio.run(run_analysis_phase())

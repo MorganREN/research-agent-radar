@@ -62,8 +62,6 @@ class DownloadManager:
             if os.path.exists(save_path): os.remove(save_path) 
             return "failed"
             
-    # async def cleanup(self):
-    #     await self.browser_engine.stop()
 
 async def main():
     downloarder = DownloadManager()

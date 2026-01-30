@@ -94,7 +94,7 @@ class ElsevierScout:
                     title=item.get('dc:title'),
                     abstract=abstract,
                     authors=item.get('dc:creator'),
-                    url=item.get('link', [{}])[0].get('@href'),
+                    url=item.get('link', [{}])[1].get('@href'),
                     published_date=date,
                     source=f"elsevier:{journal_name}",
                     is_oa=None,    # Elsevier 论文的开放获取状态需要额外判断

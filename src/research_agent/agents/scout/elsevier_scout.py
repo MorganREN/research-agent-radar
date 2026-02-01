@@ -89,6 +89,7 @@ class ElsevierScout:
                     access_paper_count += 1
                 else:
                     non_access_paper_count += 1
+                    continue  # 跳过非开放获取论文
                 paper = Paper(
                     id=f"elsevier:{item.get('dc:identifier').split(':')[-1]}",
                     title=item.get('dc:title'),

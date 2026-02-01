@@ -27,6 +27,7 @@ class Paper(SQLModel, table=True):
     
     # 后续阶段的状态预留
     download_status: str = "pending"
+    analysis_report: Optional[str] = None  # LLM 生成的分析报告
 
 # 创建一个本地 SQLite 数据库用于测试
 sqlite_file_name = "database.db"

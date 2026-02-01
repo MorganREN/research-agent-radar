@@ -5,16 +5,24 @@ import os
 # 将项目根目录加入 python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
+from src.dashboard.database import initialize_database, check_database_initialized, load_papers
+from src.dashboard.config import init_config_form
+
 import streamlit as st
-from sqlmodel import Session, select, desc
-from src.research_agent.storage.models import Paper, engine
-import os
 
 # 页面配置
 st.set_page_config(page_title="AI Research Agent", layout="wide", page_icon="🎓")
 
 st.title("🎓 自动化学术情报局")
-st.caption("AI + Civil Engineering Research Assistant")
+st.caption("Your Best Research Assistant")
+
+# Create database tables on app startup
+initialize_database()
+
+# Check if database is initialized
+if not check_database_initialized():
+    init_config_form()
+    st.stop()
 
 # --- Sidebar: 侧边栏过滤器 ---
 with st.sidebar:
@@ -24,15 +32,6 @@ with st.sidebar:
     
     st.divider()
     st.info("数据每24小时自动更新。")
-
-# --- Main Area: 数据加载 ---
-def load_papers():
-    with Session(engine) as session:
-        statement = select(Paper).order_by(desc(Paper.published_date))
-        if show_only_relevant:
-            statement = statement.where(Paper.is_relevant == True)
-        # 简单的来源过滤逻辑可以在这里加
-        return session.exec(statement).all()
 
 papers = load_papers()
 

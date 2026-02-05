@@ -64,6 +64,16 @@ class ElsevierScout:
             full_text_content = None
 
         return abstract, full_text_content
+    
+    def _parse_authors(self, authors_data) -> list[str] | None:
+        if not authors_data:
+            return None
+        authors = authors_data.get("author", [])
+        if isinstance(authors, list):
+            authors = [a['$'] for a in authors]
+            return authors
+        else:
+            return [authors.get('$')]
 
     def _fetch_papers_from_journal(self, journal_name: str) -> list[Paper]:
         query = {
@@ -82,6 +92,7 @@ class ElsevierScout:
             papers = []
             results = data.get('search-results', {}).get('entry', [])
             for item in results:
+                # logger.info(f"Fetched abstract for DOI {item.get('dc:title')}:")
                 doi = item.get('prism:doi')
                 abstract, full_text_content = self._fetch_abstract_and_fulltext(doi)
                 date = dt.datetime.strptime(item.get('prism:coverDate'), "%Y-%m-%d")
@@ -90,11 +101,14 @@ class ElsevierScout:
                 else:
                     non_access_paper_count += 1
                     continue  # 跳过非开放获取论文
+                authors = self._parse_authors(item.get('authors'))
+                if not authors:
+                    continue
                 paper = Paper(
                     id=f"elsevier:{item.get('dc:identifier').split(':')[-1]}",
                     title=item.get('dc:title'),
                     abstract=abstract,
-                    authors=item.get('dc:creator'),
+                    authors=authors,
                     url=item.get('link', [{}])[1].get('@href'),
                     published_date=date,
                     source=f"elsevier:{journal_name}",
@@ -105,11 +119,10 @@ class ElsevierScout:
                 )
                 papers.append(paper)
 
-            logger.success(f"✅ Elsevier Scout: {journal_name}，找到 {len(papers)} 篇论文 | 开放获取论文数: {access_paper_count}, 非开放获取论文数: {non_access_paper_count}")
-            return papers
         except Exception as e:
             logger.error(f"Elsevier 搜索失败 ({journal_name}): {e}")
-            return []
+        logger.success(f"✅ Elsevier Scout: {journal_name}，找到 {len(papers)} 篇论文 | 开放获取论文数: {access_paper_count}, 非开放获取论文数: {non_access_paper_count}")
+        return papers
 
     def fetch_papers(self) -> set[Paper]:
         for journal in self.journals:

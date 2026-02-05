@@ -4,7 +4,7 @@ from openai import OpenAI
 import os
 from dotenv import load_dotenv
 from sqlmodel import Session, select
-from src.research_agent.storage.models import engine, SystemConfig
+from src.research_agent.storage.models import engine
 from loguru import logger
 import yaml
 from pathlib import Path

@@ -23,21 +23,13 @@ def run_ingestion_pipeline():
     6. 音乐生成
     7. 视频生成模型和计算机视觉
     """
-
-    journals = [
-        # "Computer Networks",
-        # "Ad Hoc Networks",
-        "Tunnelling and Underground Space Technology",
-        "Automation in Construction"
-    ]
     
     # 3. 初始化 Agents
     # 3.1 搜索 arXiv 的土木工程(cs.CE) 和 人工智能(cs.AI) 板块
     arxiv_scout = ArxivScout(query="cat:cs.CE OR cat:cs.AI", max_results=10)
     # 3.2 搜索 Elsevier 的指定期刊
     elsevier_scout = ElsevierScout(
-        journals=journals,
-        max_results=2,
+        max_results=5,
         year=2026
     )
 

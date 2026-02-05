@@ -1,20 +1,28 @@
 from src.research_agent.storage.models import Paper
 import requests
-import json
 import datetime as dt
 import os
 from dotenv import load_dotenv
 from loguru import logger
+import yaml
+from pathlib import Path
 
 load_dotenv()  # 从 .env 文件加载环境变量
 
+DEFAULT_Journals = [
+        # "Computer Networks",
+        # "Ad Hoc Networks",
+        # "Tunnelling and Underground Space Technology",
+        "Automation in Construction"
+    ]
+
 class ElsevierScout:
-    def __init__(self, journals: list[str], max_results: int = 10, year: int = 2024):
+    def __init__(self, max_results: int = 10, year: int = 2024):
         """
         journals: 目标期刊名称列表 (如 ["Computer Networks", "Ad Hoc Networks"])
         max_results: 每次搜索的最大结果数
         """
-        self.journals = journals
+        self.journals = None
         self.max_results = max_results
         self.year = year
         self.search_base_url = "https://api.elsevier.com/content/search/sciencedirect"
@@ -24,6 +32,7 @@ class ElsevierScout:
             "Accept": "application/json"
         }
         self.doi_list = []
+        self._load_journays()  # 加载期刊列表
 
     def _fetch_abstract_and_fulltext(self, doi: str) -> tuple[str | None, str | None]:
         """
@@ -83,13 +92,12 @@ class ElsevierScout:
         }
         access_paper_count = 0
         non_access_paper_count = 0
-
+        papers = []
         try:
             response = requests.get(self.search_base_url, headers=self.headers, params=query)
             response.raise_for_status()
             data = response.json()
         
-            papers = []
             results = data.get('search-results', {}).get('entry', [])
             for item in results:
                 # logger.info(f"Fetched abstract for DOI {item.get('dc:title')}:")
@@ -121,8 +129,27 @@ class ElsevierScout:
 
         except Exception as e:
             logger.error(f"Elsevier 搜索失败 ({journal_name}): {e}")
-        logger.success(f"✅ Elsevier Scout: {journal_name}，找到 {len(papers)} 篇论文 | 开放获取论文数: {access_paper_count}, 非开放获取论文数: {non_access_paper_count}")
+        if papers:
+            logger.success(f"✅ Elsevier Scout: {journal_name}，找到 {len(papers)} 篇论文 | 开放获取论文数: {access_paper_count}, 非开放获取论文数: {non_access_paper_count}")
         return papers
+
+    def _load_journays(self):
+        # 这里可以实现从配置文件或数据库加载期刊列表的逻辑
+        config_path = Path(__file__).parent.parent.parent / "config" / "user_config.yaml"
+        try:
+            if config_path.exists():
+                with open(config_path, "r") as f:
+                    config = yaml.safe_load(f)
+                    if config and "journals" in config:
+                        self.journals = config.get("journals", [])
+                        logger.info("✅ Loaded journal list from user_config.yaml")
+                    else:
+                        logger.warning("⚠️ No 'journals' key found in user_config.yaml, using default journals")
+            else:
+                logger.warning(f"⚠️ Config file not found at {config_path}, using default journals")
+        except Exception as e:
+            logger.warning(f"⚠️ Error loading config: {e}, using default journals")
+            self.journals = DEFAULT_Journals
 
     def fetch_papers(self) -> set[Paper]:
         for journal in self.journals:

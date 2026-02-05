@@ -5,10 +5,11 @@ import os
 # 将项目根目录加入 python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from src.dashboard.database import initialize_database, check_database_initialized, load_papers
+from src.dashboard.database import initialize_database, check_database_initialized, load_papers, process_uploaded_pdf
 from src.dashboard.config import init_config_form
 
 import streamlit as st
+from pathlib import Path
 
 # 页面配置
 st.set_page_config(page_title="AI Research Agent", layout="wide", page_icon="🎓")
@@ -31,6 +32,30 @@ with st.sidebar:
     show_only_relevant = st.checkbox("只看高相关 (Relevant)", value=True)
     
     st.divider()
+
+    # --- PDF Upload Section ---
+    st.header("📤 上传 PDF 论文")
+    uploaded_file = st.file_uploader("选择 PDF 文件", type="pdf")
+
+    if uploaded_file is not None:
+        # 确保 data 目录存在
+        data_dir = os.path.join(os.path.dirname(__file__), "../../data")
+        Path(data_dir).mkdir(parents=True, exist_ok=True)
+
+        # 保存上传的 PDF 文件
+        file_path = os.path.join(data_dir, uploaded_file.name)
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+
+        # 解析 PDF 并显示内容
+        st.info("正在解析 PDF 文件，请稍候...")
+        result = process_uploaded_pdf(file_path)
+        if "error" in result:
+            st.error(result["error"])
+        else:
+            st.success(result["message"])
+            st.info("解析结果已存储到数据库，刷新页面查看。")
+
     st.info("数据每24小时自动更新。")
 
 papers = load_papers()

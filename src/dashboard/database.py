@@ -7,7 +7,28 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 
 from sqlmodel import Session, select, SQLModel
 from src.research_agent.storage.models import Paper, engine
+from src.research_agent.agents.analysis.extracter import PDFUploadParser
+from src.research_agent.agents.analysis.reviewer import PaperReviewer
 from loguru import logger
+
+def process_uploaded_pdf(file_path: str) -> dict:
+    parser = PDFUploadParser()
+    reviewer = PaperReviewer()
+    try:
+        paper = parser.parse_info(file_path)
+        if not paper:
+            logger.error("PDF 解析失败，无法提取论文信息。")
+            return {"error": "PDF 解析失败，无法提取论文信息。"}
+        # 这里可以直接调用 reviewer 进行分析，生成初步的分析报告
+        analysis_report = reviewer.analyze_paper(paper, pdf_path=file_path)
+        paper.analysis_report = analysis_report
+        logger.info(f"✅ 论文分析完成: {paper.title}")
+        # 将解析和分析结果存储到数据库中
+        parser.refresh_database(paper)
+        return {"message": "PDF 解析和分析完成，并已存储到数据库。", "paper_id": paper.id}
+    except Exception as e:
+        logger.error(f"处理上传 PDF 时出错: {e}")
+        return {"error": f"处理上传 PDF 时出错: {e}"}
 
 def initialize_database() -> bool:
     """Create all database tables"""

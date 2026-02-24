@@ -39,7 +39,7 @@ def run_ingestion_pipeline():
     # 5. 运行 Scout (侦察)
     new_papers = []
     new_papers += arxiv_scout.fetch_papers()
-    new_papers += elsevier_scout.fetch_papers()
+    # new_papers += elsevier_scout.fetch_papers()
 
 
     with Session(engine) as session:

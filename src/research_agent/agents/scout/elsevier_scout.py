@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from loguru import logger
 import yaml
 from pathlib import Path
+from bs4 import BeautifulSoup
 
 load_dotenv()  # 从 .env 文件加载环境变量
 
@@ -15,6 +16,45 @@ DEFAULT_Journals = [
         # "Tunnelling and Underground Space Technology",
         "Automation in Construction"
     ]
+
+def parse_elsevier_xml_to_markdown(xml_content):
+    # 建议使用 'lxml-xml' 解析器来处理 XML
+    soup = BeautifulSoup(xml_content, 'lxml-xml')
+    markdown_lines = []
+
+    # 1. 提取文章主标题
+    # Elsevier 通常使用 <dc:title> 或 <ce:title> 作为主标题
+    title_node = soup.find('dc:title') or soup.find('ce:title')
+    if title_node:
+        markdown_lines.append(f"# {title_node.get_text(strip=True)}\n")
+
+    # 2. 提取摘要
+    abstract_node = soup.find('ce:abstract')
+    if abstract_node:
+        markdown_lines.append("## Abstract\n")
+        # 摘要内可能有多个段落
+        for para in abstract_node.find_all('ce:para'):
+            markdown_lines.append(f"{para.get_text(strip=True)}\n")
+
+    # 3. 提取正文主体
+    # Elsevier 正文通常包含在 <ce:sections> 中，由多个 <ce:section> 组成
+    sections = soup.find_all('ce:section')
+    for section in sections:
+        # 提取章节标题
+        sec_title = section.find('ce:section-title')
+        if sec_title:
+            markdown_lines.append(f"## {sec_title.get_text(strip=True)}\n")
+        
+        # 提取章节内的段落
+        # 注意只获取当前 section 的直接段落，避免嵌套过深导致重复提取
+        for para in section.find_all('ce:para', recursive=False):
+            markdown_lines.append(f"{para.get_text(strip=True)}\n")
+            
+        # (可选) 处理子章节 <ce:section> 的递归或查找，这里简略展示主逻辑
+
+    # 将列表合并为完整的 Markdown 字符串
+    clean_markdown = "\n".join(markdown_lines)
+    return clean_markdown
 
 class ElsevierScout:
     def __init__(self, max_results: int = 10, year: int = 2024):
@@ -64,7 +104,7 @@ class ElsevierScout:
             xml_headers["Accept"] = "application/xml"
             r_fulltext = requests.get(base_url, headers=xml_headers, params=params)
             if r_fulltext.status_code == 200:
-                full_text_content = r_fulltext.text  # 目前是直接存库，后续可考虑解析升级
+                full_text_content = parse_elsevier_xml_to_markdown(r_fulltext.text)  # 当前解析xml的方法由AI生成，后续可以根据实际情况调整
             else:
                 logger.warning(f"⚠️ No full text found for DOI: {doi}, status code: {r_fulltext.status_code}")
                 full_text_content = None
@@ -165,7 +205,7 @@ if __name__ == "__main__":
         'Tunnelling and Underground Space Technology',
         'Automation in Construction'
     ]
-    scout = ElsevierScout(journals=journals, max_results=5, year=2024)
+    scout = ElsevierScout(max_results=5, year=2024)
     papers = scout.fetch_papers()
     for paper in papers:
         print(f"{paper.title} ({paper.published_date})")

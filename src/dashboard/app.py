@@ -10,7 +10,7 @@ from src.dashboard.database import (
     initialize_database, check_database_initialized, load_papers,
     process_uploaded_pdf, start_background_analysis,
     get_analysis_status, clear_analysis_status, has_running_tasks,
-    toggle_bookmark,
+    toggle_bookmark, get_distinct_sources,
 )
 from src.dashboard.config import init_config_form
 
@@ -25,17 +25,18 @@ st.set_page_config(page_title="AI Research Agent", layout="wide", page_icon="�
 # ============================
 SOURCE_COLORS = {
     "arxiv": "#B71C1C",
-    "sciencedirect": "#E65100",
     "uploaded_pdf": "#1565C0",
     "asce": "#2E7D32",
 }
 
 SOURCE_LABELS = {
     "arxiv": "arXiv",
-    "sciencedirect": "ScienceDirect",
     "uploaded_pdf": "PDF Upload",
     "asce": "ASCE",
 }
+
+# Palette for dynamically-assigned elsevier journal colors
+ELSEVIER_COLORS = ["#E65100", "#6A1B9A", "#00695C", "#AD1457", "#283593", "#4E342E", "#37474F", "#0277BD"]
 
 SCORE_COLORS = {
     (9, 10): "#1B5E20",  # Deep green
@@ -172,8 +173,15 @@ def get_score_color(score) -> str:
 
 
 def render_source_badge(source: str) -> str:
-    color = SOURCE_COLORS.get(source, "#757575")
-    label = SOURCE_LABELS.get(source, source)
+    if source in SOURCE_COLORS:
+        color = SOURCE_COLORS[source]
+        label = SOURCE_LABELS.get(source, source)
+    elif source.startswith("elsevier:"):
+        label = source[len("elsevier:"):]
+        color = ELSEVIER_COLORS[hash(source) % len(ELSEVIER_COLORS)]
+    else:
+        color = "#757575"
+        label = source
     return f'<span class="source-badge" style="background:{color};">{label}</span>'
 
 
@@ -243,7 +251,16 @@ if "selected_paper_id" not in st.session_state:
 # ============================
 with st.sidebar:
     st.header("🔍 筛选与排序")
-    filter_source = st.multiselect("来源平台", ["arxiv", "sciencedirect", "asce", "uploaded_pdf"], default=["arxiv", "uploaded_pdf"])
+
+    def _source_label(s: str) -> str:
+        if s in SOURCE_LABELS:
+            return SOURCE_LABELS[s]
+        if s.startswith("elsevier:"):
+            return s[len("elsevier:"):]
+        return s
+
+    all_sources = get_distinct_sources()
+    filter_source = st.multiselect("来源平台", options=all_sources, default=[], format_func=_source_label)
     show_only_relevant = st.checkbox("只看高相关 (Relevant)", value=True)
     show_bookmarked_only = st.checkbox("⭐ 只看收藏", value=False)
     sort_by = st.selectbox("排序方式", ["按日期排序", "按评分排序"], index=0)
@@ -253,29 +270,34 @@ with st.sidebar:
 
     # --- PDF Upload ---
     st.header("📤 上传 PDF 论文")
-    uploaded_file = st.file_uploader("选择 PDF 文件", type="pdf")
+    uploaded_files = st.file_uploader("选择 PDF 文件", type="pdf", accept_multiple_files=True)
 
-    if uploaded_file is not None and uploaded_file.name not in st.session_state.processed_uploads:
-        st.session_state.processed_uploads.add(uploaded_file.name)
+    new_files = [f for f in uploaded_files if f.name not in st.session_state.processed_uploads]
 
+    if new_files:
         data_dir = os.path.join(os.path.dirname(__file__), "../../data")
         Path(data_dir).mkdir(parents=True, exist_ok=True)
 
-        file_path = os.path.join(data_dir, uploaded_file.name)
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
+        submitted = 0
+        with st.spinner(f"正在提取 {len(new_files)} 篇论文元数据..."):
+            for uf in new_files:
+                st.session_state.processed_uploads.add(uf.name)
+                file_path = os.path.join(data_dir, uf.name)
+                with open(file_path, "wb") as f:
+                    f.write(uf.getbuffer())
 
-        with st.spinner("正在提取论文元数据..."):
-            result = process_uploaded_pdf(file_path)
+                result = process_uploaded_pdf(file_path)
+                if "error" in result:
+                    st.error(f"{uf.name}: {result['error']}")
+                    st.session_state.processed_uploads.discard(uf.name)
+                else:
+                    paper_id = result["paper_id"]
+                    start_background_analysis(paper_id, file_path)
+                    st.session_state.analyzing_papers[paper_id] = file_path
+                    submitted += 1
 
-        if "error" in result:
-            st.error(result["error"])
-            st.session_state.processed_uploads.discard(uploaded_file.name)
-        else:
-            paper_id = result["paper_id"]
-            st.success("元数据提取完成，后台开始深度分析...")
-            start_background_analysis(paper_id, file_path)
-            st.session_state.analyzing_papers[paper_id] = file_path
+        if submitted > 0:
+            st.success(f"元数据提取完成，{submitted} 篇论文已提交后台分析（最多 3 篇并行）")
             st.rerun()
 
     # --- 后台分析任务状态 ---

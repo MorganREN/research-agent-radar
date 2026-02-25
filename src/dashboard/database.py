@@ -2,6 +2,7 @@
 import sys
 import os
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 # 将项目根目录加入 python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -17,6 +18,7 @@ from loguru import logger
 # 状态: "running" | "done" | "error"
 _analysis_tasks: dict[str, str] = {}
 _tasks_lock = threading.Lock()
+_analysis_executor = ThreadPoolExecutor(max_workers=3)
 
 
 def _ensure_columns():
@@ -86,17 +88,12 @@ def _run_analysis_background(paper_id: str, file_path: str):
 
 
 def start_background_analysis(paper_id: str, file_path: str):
-    """启动后台线程执行论文深度分析。"""
+    """提交论文深度分析到线程池（最多 3 篇并行）。"""
     with _tasks_lock:
         if _analysis_tasks.get(paper_id) == "running":
             return  # 已在运行
         _analysis_tasks[paper_id] = "running"
-    t = threading.Thread(
-        target=_run_analysis_background,
-        args=(paper_id, file_path),
-        daemon=True,
-    )
-    t.start()
+    _analysis_executor.submit(_run_analysis_background, paper_id, file_path)
 
 
 def get_analysis_status(paper_id: str) -> str | None:
@@ -115,6 +112,18 @@ def has_running_tasks() -> bool:
     """是否有正在运行的后台分析任务。"""
     with _tasks_lock:
         return any(v == "running" for v in _analysis_tasks.values())
+
+
+def get_distinct_sources() -> list[str]:
+    """Return sorted list of distinct paper source values from the database."""
+    try:
+        with Session(engine) as session:
+            statement = select(Paper.source).distinct()
+            results = session.exec(statement).all()
+            return sorted(results)
+    except Exception as e:
+        logger.error(f"Error loading distinct sources: {e}")
+        return []
 
 
 def toggle_bookmark(paper_id: str) -> bool:

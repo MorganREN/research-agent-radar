@@ -209,3 +209,7 @@ __marimo__/
 # temp data files
 data/
 *.db
+src/research_agent/config/user_config.yaml
+src/research_agent/config/analysis_prompt.yaml
+
+.vscode/

@@ -64,7 +64,7 @@ The output should be a JSON object with the above fields. If any field is not fo
                 title=basic_info.get("title", ""),
                 abstract=basic_info.get("abstract", ""),
                 authors=basic_info.get("authors", []),
-                url=f"google.com/search?q={basic_info.get('title', '').replace(' ', '+')}",
+                url=f"https://google.com/search?q={basic_info.get('title', '').replace(' ', '+')}",
                 published_date=dt.datetime.today(),
                 source="uploaded_pdf",
                 is_relevant=True,  # 默认上传的论文都相关

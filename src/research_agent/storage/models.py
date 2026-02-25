@@ -32,7 +32,7 @@ class Paper(SQLModel, table=True):
 # 创建一个本地 SQLite 数据库用于测试
 sqlite_file_name = "database.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"
-engine = create_engine(sqlite_url)
+engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

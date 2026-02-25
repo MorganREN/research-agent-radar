@@ -41,7 +41,7 @@ Format your response as a clear, standalone prompt that can be directly used. Ex
             )
             prompt_template = response.choices[0].message.content
             # add one line to make sure the output is in markdown format
-            prompt_template = prompt_template + "\n\nPlease provide your analysis in Markdown format."
+            prompt_template = prompt_template + "\n\nPlease provide your analysis in Markdown."
             logger.info("✅ Analysis prompt template generated successfully")
             return prompt_template
         except Exception as e:

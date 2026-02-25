@@ -19,13 +19,126 @@ from pathlib import Path
 # 页面配置
 st.set_page_config(page_title="AI Research Agent", layout="wide", page_icon="🎓")
 
-st.title("🎓 自动化学术情报局")
-st.caption("Your Best Research Assistant")
+# ============================
+# Custom CSS
+# ============================
+SOURCE_COLORS = {
+    "arxiv": "#B71C1C",
+    "sciencedirect": "#E65100",
+    "uploaded_pdf": "#1565C0",
+    "asce": "#2E7D32",
+}
 
-# Create database tables on app startup
+st.markdown("""
+<style>
+    /* ---- 全局字体 ---- */
+    .main .block-container { padding-top: 2rem; }
+
+    /* ---- 论文卡片列表: 可滚动区域 ---- */
+    div[data-testid="stVerticalBlockBorderWrapper"] .paper-scroll {
+        max-height: 75vh;
+        overflow-y: auto;
+        padding-right: 4px;
+    }
+
+    /* ---- 来源 badge ---- */
+    .source-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        color: white;
+        letter-spacing: 0.3px;
+        text-transform: uppercase;
+    }
+
+    /* ---- 状态圆点 ---- */
+    .status-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: middle;
+    }
+    .status-analyzed  { background-color: #4CAF50; }
+    .status-analyzing { background-color: #FF9800; animation: pulse 1.5s infinite; }
+    .status-pending   { background-color: #BDBDBD; }
+
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50%      { opacity: 0.4; }
+    }
+
+    /* ---- 论文卡片按钮: 去除默认按钮样式 ---- */
+    .paper-card-btn button {
+        background: none !important;
+        border: none !important;
+        text-align: left !important;
+        font-weight: 600 !important;
+        color: #1a1a2e !important;
+        padding: 4px 0 !important;
+        font-size: 0.9rem !important;
+        line-height: 1.35 !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+    }
+    .paper-card-btn button:hover {
+        color: #1976D2 !important;
+    }
+    .paper-card-btn button:focus {
+        box-shadow: none !important;
+    }
+
+    /* ---- 详情面板 metadata 行 ---- */
+    .meta-chip {
+        display: inline-block;
+        padding: 3px 10px;
+        border-radius: 16px;
+        font-size: 0.78rem;
+        margin-right: 6px;
+        margin-bottom: 4px;
+        background: #F5F5F5;
+        color: #424242;
+        border: 1px solid #E0E0E0;
+    }
+    .meta-chip a {
+        color: #1976D2;
+        text-decoration: none;
+    }
+
+    /* ---- 选中卡片高亮（▸ 指示器通过内联 HTML 实现） ---- */
+</style>
+""", unsafe_allow_html=True)
+
+
+# ============================
+# 辅助函数
+# ============================
+def render_source_badge(source: str) -> str:
+    color = SOURCE_COLORS.get(source, "#757575")
+    label = {"arxiv": "arXiv", "sciencedirect": "ScienceDirect", "uploaded_pdf": "PDF Upload", "asce": "ASCE"}.get(source, source)
+    return f'<span class="source-badge" style="background:{color};">{label}</span>'
+
+
+def render_status_dot(paper, analyzing_set: dict) -> str:
+    if paper.analysis_report:
+        return '<span class="status-dot status-analyzed" title="已分析"></span>'
+    elif paper.id in analyzing_set:
+        return '<span class="status-dot status-analyzing" title="分析中"></span>'
+    else:
+        return '<span class="status-dot status-pending" title="待分析"></span>'
+
+
+# ============================
+# 初始化
+# ============================
+st.markdown("## 🎓 自动化学术情报局")
+st.caption("Your AI-Powered Research Assistant")
+
 initialize_database()
 
-# Check if database is initialized
 if not check_database_initialized():
     init_config_form()
     st.stop()
@@ -34,34 +147,35 @@ if not check_database_initialized():
 if "processed_uploads" not in st.session_state:
     st.session_state.processed_uploads = set()
 if "analyzing_papers" not in st.session_state:
-    st.session_state.analyzing_papers = {}  # paper_id -> file_path
+    st.session_state.analyzing_papers = {}
+if "selected_paper_id" not in st.session_state:
+    st.session_state.selected_paper_id = None
 
-# --- Sidebar: 侧边栏过滤器 ---
+
+# ============================
+# Sidebar
+# ============================
 with st.sidebar:
     st.header("🔍 筛选控制")
-    filter_source = st.multiselect("来源平台", ["arxiv", "sciencedirect", "asce"], default=["arxiv"])
+    filter_source = st.multiselect("来源平台", ["arxiv", "sciencedirect", "asce", "uploaded_pdf"], default=["arxiv", "uploaded_pdf"])
     show_only_relevant = st.checkbox("只看高相关 (Relevant)", value=True)
 
     st.divider()
 
-    # --- PDF Upload Section ---
+    # --- PDF Upload ---
     st.header("📤 上传 PDF 论文")
     uploaded_file = st.file_uploader("选择 PDF 文件", type="pdf")
 
     if uploaded_file is not None and uploaded_file.name not in st.session_state.processed_uploads:
-        # 标记为已处理，防止重复上传
         st.session_state.processed_uploads.add(uploaded_file.name)
 
-        # 确保 data 目录存在
         data_dir = os.path.join(os.path.dirname(__file__), "../../data")
         Path(data_dir).mkdir(parents=True, exist_ok=True)
 
-        # 保存上传的 PDF 文件
         file_path = os.path.join(data_dir, uploaded_file.name)
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
 
-        # 解析 PDF 元数据（相对较快，同步执行）
         with st.spinner("正在提取论文元数据..."):
             result = process_uploaded_pdf(file_path)
 
@@ -71,7 +185,6 @@ with st.sidebar:
         else:
             paper_id = result["paper_id"]
             st.success("元数据提取完成，后台开始深度分析...")
-            # 启动后台分析线程
             start_background_analysis(paper_id, file_path)
             st.session_state.analyzing_papers[paper_id] = file_path
             st.rerun()
@@ -79,7 +192,7 @@ with st.sidebar:
     # --- 后台分析任务状态 ---
     if st.session_state.analyzing_papers:
         st.divider()
-        st.header("⏳ 后台分析任务")
+        st.markdown("##### ⏳ 后台分析任务")
         completed = []
         for pid in list(st.session_state.analyzing_papers.keys()):
             status = get_analysis_status(pid)
@@ -94,58 +207,105 @@ with st.sidebar:
                 clear_analysis_status(pid)
                 completed.append(pid)
             else:
-                # 状态丢失（如进程重启），清理
                 completed.append(pid)
         for pid in completed:
             st.session_state.analyzing_papers.pop(pid, None)
 
     st.divider()
-    st.info("数据每24小时自动更新。")
+    st.caption("数据每24小时自动更新")
 
-papers = load_papers()
+
+# ============================
+# 主内容区
+# ============================
+papers = load_papers(show_only_relevant=show_only_relevant, filter_sources=filter_source)
 
 if not papers:
-    st.warning("暂无数据，请先运行 main_demo.py 抓取论文。")
+    st.info("暂无数据，请先运行 `main_demo.py` 抓取论文，或在侧边栏上传 PDF。")
 else:
-    # --- 布局：左侧列表，右侧详情 ---
-    col1, col2 = st.columns([1, 2])
+    # 如果没有选中论文或选中的论文不在列表中，默认选第一篇
+    if st.session_state.selected_paper_id not in [p.id for p in papers]:
+        st.session_state.selected_paper_id = papers[0].id
 
-    with col1:
-        st.subheader(f"📄 最新论文 ({len(papers)})")
-        selected_paper_id = st.radio(
-            "选择论文查看详情:",
-            options=[p.id for p in papers],
-            format_func=lambda x: next((p.title for p in papers if p.id == x), x)
-        )
+    col_list, col_detail = st.columns([2, 5])
 
-        # 获取选中的论文对象
-        current_paper = next(p for p in papers if p.id == selected_paper_id)
+    # ---- 左栏: 论文卡片列表 ----
+    with col_list:
+        st.markdown(f"#### 📄 论文列表 ({len(papers)})")
 
-    with col2:
-        if current_paper:
-            # 标题区
-            st.markdown(f"## {current_paper.title}")
-            st.markdown(f"**作者**: {', '.join(current_paper.authors)} | **日期**: {current_paper.published_date.date()}")
+        for paper in papers:
+            is_selected = (paper.id == st.session_state.selected_paper_id)
 
-            # 链接按钮
-            if current_paper.url:
-                st.link_button("🔗 原文链接", current_paper.url)
+            with st.container(border=True):
+                # 第一行: 状态点 + 来源 badge + 日期
+                dot = render_status_dot(paper, st.session_state.analyzing_papers)
+                badge = render_source_badge(paper.source)
+                date_str = paper.published_date.strftime("%Y-%m-%d")
+                selector = '<span style="color:#1976D2;font-weight:bold;">▸ </span>' if is_selected else ""
+                st.markdown(
+                    f'{selector}{dot}{badge} <span style="color:#999;font-size:0.75rem;float:right;">{date_str}</span>',
+                    unsafe_allow_html=True,
+                )
 
-            # 选项卡：分析报告 vs 原始摘要
-            tab1, tab2 = st.tabs(["📊 深度分析报告", "📝 原始摘要"])
+                # 第二行: 论文标题（可点击）
+                display_title = paper.title if len(paper.title) <= 120 else paper.title[:117] + "..."
+                with st.container():
+                    st.markdown('<div class="paper-card-btn">', unsafe_allow_html=True)
+                    if st.button(display_title, key=f"sel_{paper.id}", use_container_width=True):
+                        st.session_state.selected_paper_id = paper.id
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
 
-            with tab1:
-                if current_paper.analysis_report:
-                    st.markdown(current_paper.analysis_report)
-                elif current_paper.id in st.session_state.analyzing_papers:
-                    st.info("⏳ 该论文正在后台分析中，完成后会自动显示报告...")
-                else:
-                    st.info("🚧 该论文尚未生成详细报告 (等待 Analyst Agent 处理...)")
+                # 第三行: 作者（缩略）
+                if paper.authors:
+                    authors_short = ", ".join(paper.authors[:3])
+                    if len(paper.authors) > 3:
+                        authors_short += f" et al."
+                    st.caption(authors_short)
 
-            with tab2:
-                st.write(current_paper.abstract)
+    # ---- 右栏: 论文详情面板 ----
+    current_paper = next(p for p in papers if p.id == st.session_state.selected_paper_id)
 
-# --- 自动刷新：有后台任务运行时每 10 秒自动 rerun ---
+    with col_detail:
+        # 标题
+        st.markdown(f"### {current_paper.title}")
+
+        # Metadata chips
+        authors_str = ", ".join(current_paper.authors) if current_paper.authors else "Unknown"
+        date_str = current_paper.published_date.strftime("%Y-%m-%d")
+        badge_html = render_source_badge(current_paper.source)
+
+        chips = f'{badge_html}'
+        chips += f' <span class="meta-chip">📅 {date_str}</span>'
+        if current_paper.doi:
+            chips += f' <span class="meta-chip">DOI: {current_paper.doi}</span>'
+        st.markdown(chips, unsafe_allow_html=True)
+        st.caption(f"**Authors:** {authors_str}")
+
+        # 链接按钮
+        if current_paper.url:
+            st.link_button("🔗 查看原文", current_paper.url)
+
+        st.divider()
+
+        # 选项卡
+        tab1, tab2 = st.tabs(["📊 深度分析报告", "📝 原始摘要"])
+
+        with tab1:
+            if current_paper.analysis_report:
+                st.markdown(current_paper.analysis_report)
+            elif current_paper.id in st.session_state.analyzing_papers:
+                st.info("⏳ 该论文正在后台分析中，完成后会自动显示报告...")
+            else:
+                st.info("🚧 该论文尚未生成详细报告 (等待 Analyst Agent 处理...)")
+
+        with tab2:
+            st.markdown(current_paper.abstract)
+
+
+# ============================
+# 自动刷新 (后台任务运行时)
+# ============================
 if has_running_tasks():
     time.sleep(10)
     st.rerun()

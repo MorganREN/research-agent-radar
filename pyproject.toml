@@ -27,9 +27,11 @@ dependencies = [
     "lxml>=5.0.0"
 ]
 
-
-[tool.poetry.scripts]
+[project.scripts]
 radar = "src.run:main"
+
+[tool.poetry]
+packages = [{include = "src"}]
 
 
 [build-system]

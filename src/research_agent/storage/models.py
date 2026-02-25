@@ -24,7 +24,11 @@ class Paper(SQLModel, table=True):
     # 筛选结果
     is_relevant: Optional[bool] = None  # True/False/None(未处理)
     relevance_reason: Optional[str] = None # LLM 给出的理由
-    
+    relevance_score: Optional[int] = None  # 相关性评分 1-10，仅通过筛选的论文有值
+
+    # 用户交互
+    is_bookmarked: bool = False  # 用户收藏标记
+
     # 后续阶段的状态预留
     download_status: str = "pending"
     analysis_report: Optional[str] = None  # LLM 生成的分析报告

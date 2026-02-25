@@ -39,7 +39,7 @@ def run_ingestion_pipeline():
     # 5. 运行 Scout (侦察)
     new_papers = []
     new_papers += arxiv_scout.fetch_papers()
-    # new_papers += elsevier_scout.fetch_papers()
+    new_papers += elsevier_scout.fetch_papers()
 
 
     with Session(engine) as session:
@@ -57,13 +57,15 @@ def run_ingestion_pipeline():
             # 5.3 更新结果
             paper.is_relevant = result['is_relevant']
             paper.relevance_reason = result['reason']
-            
+            paper.relevance_score = result.get('relevance_score', 0)
+
             # 5.4 存入数据库
             session.add(paper)
             session.commit()
-            
+
             icon = "✅" if paper.is_relevant else "❌"
-            print(f"{icon} [{paper.id}] 判定结果: {paper.is_relevant}")
+            score_str = f" (评分: {paper.relevance_score}/10)" if paper.is_relevant else ""
+            print(f"{icon} [{paper.id}] 判定结果: {paper.is_relevant}{score_str}")
             print(f"   理由: {paper.relevance_reason}\n")
 
 async def run_analysis_phase():
@@ -107,7 +109,7 @@ async def run_analysis_phase():
                 if paper.source == "arxiv":
                     report = reviewer.analyze_paper(paper, pdf_path=save_path)
                 else:
-                    report = reviewer.analyze_paper(paper, xml_content=paper.full_text_content)
+                    report = reviewer.analyze_paper(paper, full_content=paper.full_text_content)
                 paper.analysis_report = report
                 session.add(paper)
                 session.commit()

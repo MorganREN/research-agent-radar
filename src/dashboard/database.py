@@ -6,7 +6,8 @@ import threading
 # 将项目根目录加入 python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from sqlmodel import Session, select, SQLModel
+from sqlmodel import Session, select, SQLModel, col
+from sqlalchemy import text
 from src.research_agent.storage.models import Paper, engine
 from src.research_agent.agents.analysis.extracter import PDFUploadParser
 from src.research_agent.agents.analysis.reviewer import PaperReviewer
@@ -16,6 +17,22 @@ from loguru import logger
 # 状态: "running" | "done" | "error"
 _analysis_tasks: dict[str, str] = {}
 _tasks_lock = threading.Lock()
+
+
+def _ensure_columns():
+    """为已有的 paper 表添加新增列（SQLite 安全，列已存在时忽略）。"""
+    migrations = [
+        ("relevance_score", "INTEGER"),
+        ("is_bookmarked", "BOOLEAN DEFAULT 0"),
+    ]
+    with engine.connect() as conn:
+        for col_name, col_def in migrations:
+            try:
+                conn.execute(text(f"ALTER TABLE paper ADD COLUMN {col_name} {col_def}"))
+                conn.commit()
+                logger.info(f"Added column: {col_name}")
+            except Exception:
+                pass  # 列已存在
 
 
 def process_uploaded_pdf(file_path: str) -> dict:
@@ -89,15 +106,30 @@ def has_running_tasks() -> bool:
         return any(v == "running" for v in _analysis_tasks.values())
 
 
+def toggle_bookmark(paper_id: str) -> bool:
+    """切换论文的收藏状态，返回新的 is_bookmarked 值。"""
+    with Session(engine) as session:
+        paper = session.get(Paper, paper_id)
+        if not paper:
+            return False
+        paper.is_bookmarked = not paper.is_bookmarked
+        session.add(paper)
+        session.commit()
+        logger.info(f"Bookmark toggled: {paper_id} -> {paper.is_bookmarked}")
+        return paper.is_bookmarked
+
+
 def initialize_database() -> bool:
-    """Create all database tables"""
+    """Create all database tables and ensure new columns exist."""
     try:
         SQLModel.metadata.create_all(engine)
-        logger.info("✅ Database tables initialized")
+        _ensure_columns()
+        logger.info("Database tables initialized")
         return True
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
         return False
+
 
 def check_database_initialized() -> bool:
     """Check if database has papers, indicating it's been initialized"""
@@ -105,29 +137,43 @@ def check_database_initialized() -> bool:
         with Session(engine) as session:
             statement = select(Paper)
             result = session.exec(statement).first()
-            is_initialized = result is not None
-            status = "✅ Database initialized with data" if is_initialized else "⚠️ Database empty"
-            logger.info(status)
-            return is_initialized
+            return result is not None
     except Exception as e:
         logger.error(f"Database connection error: {e}")
         return False
 
-def load_papers(show_only_relevant: bool = True, filter_sources: list = None):
-    """Load papers from database with optional filtering"""
+
+def load_papers(
+    show_only_relevant: bool = True,
+    filter_sources: list = None,
+    sort_by: str = "date",
+    show_bookmarked_only: bool = False,
+):
+    """Load papers from database with filtering and sorting."""
     try:
         with Session(engine) as session:
-            statement = select(Paper).order_by(Paper.published_date.desc())
+            statement = select(Paper)
 
             if show_only_relevant:
                 statement = statement.where(Paper.is_relevant == True)
 
-            # Add source filtering if provided
             if filter_sources:
                 statement = statement.where(Paper.source.in_(filter_sources))
 
+            if show_bookmarked_only:
+                statement = statement.where(Paper.is_bookmarked == True)
+
+            # 排序
+            if sort_by == "score":
+                statement = statement.order_by(
+                    col(Paper.relevance_score).desc().nulls_last(),
+                    Paper.published_date.desc(),
+                )
+            else:
+                statement = statement.order_by(Paper.published_date.desc())
+
             papers = session.exec(statement).all()
-            logger.info(f"✅ Loaded {len(papers)} papers from database")
+            logger.info(f"Loaded {len(papers)} papers from database")
             return papers
     except Exception as e:
         logger.error(f"Error loading papers: {e}")

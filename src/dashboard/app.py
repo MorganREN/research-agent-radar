@@ -10,6 +10,7 @@ from src.dashboard.database import (
     initialize_database, check_database_initialized, load_papers,
     process_uploaded_pdf, start_background_analysis,
     get_analysis_status, clear_analysis_status, has_running_tasks,
+    toggle_bookmark,
 )
 from src.dashboard.config import init_config_form
 
@@ -20,7 +21,7 @@ from pathlib import Path
 st.set_page_config(page_title="AI Research Agent", layout="wide", page_icon="🎓")
 
 # ============================
-# Custom CSS
+# 常量
 # ============================
 SOURCE_COLORS = {
     "arxiv": "#B71C1C",
@@ -29,17 +30,29 @@ SOURCE_COLORS = {
     "asce": "#2E7D32",
 }
 
+SOURCE_LABELS = {
+    "arxiv": "arXiv",
+    "sciencedirect": "ScienceDirect",
+    "uploaded_pdf": "PDF Upload",
+    "asce": "ASCE",
+}
+
+SCORE_COLORS = {
+    (9, 10): "#1B5E20",  # Deep green
+    (7, 8):  "#4CAF50",  # Green
+    (5, 6):  "#F9A825",  # Yellow
+    (3, 4):  "#E65100",  # Orange
+    (1, 2):  "#C62828",  # Red
+}
+SCORE_COLOR_NONE = "#9E9E9E"  # Gray
+
+
+# ============================
+# Custom CSS
+# ============================
 st.markdown("""
 <style>
-    /* ---- 全局字体 ---- */
     .main .block-container { padding-top: 2rem; }
-
-    /* ---- 论文卡片列表: 可滚动区域 ---- */
-    div[data-testid="stVerticalBlockBorderWrapper"] .paper-scroll {
-        max-height: 75vh;
-        overflow-y: auto;
-        padding-right: 4px;
-    }
 
     /* ---- 来源 badge ---- */
     .source-badge {
@@ -103,12 +116,45 @@ st.markdown("""
         color: #424242;
         border: 1px solid #E0E0E0;
     }
-    .meta-chip a {
-        color: #1976D2;
-        text-decoration: none;
+
+    /* ---- 评分 badge ---- */
+    .score-badge {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: white;
+        margin-left: 4px;
+        vertical-align: middle;
     }
 
-    /* ---- 选中卡片高亮（▸ 指示器通过内联 HTML 实现） ---- */
+    /* ---- 收藏星标 ---- */
+    .bookmark-star {
+        color: #FFC107;
+        font-size: 0.85rem;
+        margin-left: 4px;
+        vertical-align: middle;
+    }
+
+    /* ---- 详情面板评分条 ---- */
+    .score-bar-container {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 8px;
+    }
+    .score-bar-segment {
+        width: 18px;
+        height: 10px;
+        border-radius: 2px;
+        display: inline-block;
+    }
+    .score-bar-label {
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-left: 6px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -116,9 +162,18 @@ st.markdown("""
 # ============================
 # 辅助函数
 # ============================
+def get_score_color(score) -> str:
+    if score is None:
+        return SCORE_COLOR_NONE
+    for (lo, hi), color in SCORE_COLORS.items():
+        if lo <= score <= hi:
+            return color
+    return SCORE_COLOR_NONE
+
+
 def render_source_badge(source: str) -> str:
     color = SOURCE_COLORS.get(source, "#757575")
-    label = {"arxiv": "arXiv", "sciencedirect": "ScienceDirect", "uploaded_pdf": "PDF Upload", "asce": "ASCE"}.get(source, source)
+    label = SOURCE_LABELS.get(source, source)
     return f'<span class="source-badge" style="background:{color};">{label}</span>'
 
 
@@ -129,6 +184,37 @@ def render_status_dot(paper, analyzing_set: dict) -> str:
         return '<span class="status-dot status-analyzing" title="分析中"></span>'
     else:
         return '<span class="status-dot status-pending" title="待分析"></span>'
+
+
+def render_score_badge(score) -> str:
+    if score is None:
+        return '<span class="score-badge" style="background:#9E9E9E;">N/A</span>'
+    color = get_score_color(score)
+    return f'<span class="score-badge" style="background:{color};">{score}/10</span>'
+
+
+def render_score_bar(score) -> str:
+    """渲染详情面板的评分条。"""
+    if score is None:
+        return '<div class="score-bar-container"><span class="score-bar-label" style="color:#9E9E9E;">评分: N/A</span></div>'
+    filled_color = get_score_color(score)
+    empty_color = "#E0E0E0"
+    segments = ""
+    for i in range(1, 11):
+        c = filled_color if i <= score else empty_color
+        segments += f'<span class="score-bar-segment" style="background:{c};"></span>'
+    return (
+        f'<div class="score-bar-container">'
+        f'{segments}'
+        f'<span class="score-bar-label" style="color:{filled_color};">{score}/10</span>'
+        f'</div>'
+    )
+
+
+def render_bookmark_star(is_bookmarked: bool) -> str:
+    if is_bookmarked:
+        return '<span class="bookmark-star" title="已收藏">★</span>'
+    return ""
 
 
 # ============================
@@ -156,9 +242,12 @@ if "selected_paper_id" not in st.session_state:
 # Sidebar
 # ============================
 with st.sidebar:
-    st.header("🔍 筛选控制")
+    st.header("🔍 筛选与排序")
     filter_source = st.multiselect("来源平台", ["arxiv", "sciencedirect", "asce", "uploaded_pdf"], default=["arxiv", "uploaded_pdf"])
     show_only_relevant = st.checkbox("只看高相关 (Relevant)", value=True)
+    show_bookmarked_only = st.checkbox("⭐ 只看收藏", value=False)
+    sort_by = st.selectbox("排序方式", ["按日期排序", "按评分排序"], index=0)
+    sort_key = "score" if sort_by == "按评分排序" else "date"
 
     st.divider()
 
@@ -218,7 +307,12 @@ with st.sidebar:
 # ============================
 # 主内容区
 # ============================
-papers = load_papers(show_only_relevant=show_only_relevant, filter_sources=filter_source)
+papers = load_papers(
+    show_only_relevant=show_only_relevant,
+    filter_sources=filter_source,
+    sort_by=sort_key,
+    show_bookmarked_only=show_bookmarked_only,
+)
 
 if not papers:
     st.info("暂无数据，请先运行 `main_demo.py` 抓取论文，或在侧边栏上传 PDF。")
@@ -237,13 +331,16 @@ else:
             is_selected = (paper.id == st.session_state.selected_paper_id)
 
             with st.container(border=True):
-                # 第一行: 状态点 + 来源 badge + 日期
+                # 第一行: 选中指示 + 状态点 + 来源 badge + 评分 badge + 收藏星 + 日期
                 dot = render_status_dot(paper, st.session_state.analyzing_papers)
                 badge = render_source_badge(paper.source)
+                score_badge = render_score_badge(paper.relevance_score)
+                star = render_bookmark_star(paper.is_bookmarked)
                 date_str = paper.published_date.strftime("%Y-%m-%d")
                 selector = '<span style="color:#1976D2;font-weight:bold;">▸ </span>' if is_selected else ""
                 st.markdown(
-                    f'{selector}{dot}{badge} <span style="color:#999;font-size:0.75rem;float:right;">{date_str}</span>',
+                    f'{selector}{dot}{badge} {score_badge}{star}'
+                    f' <span style="color:#999;font-size:0.75rem;float:right;">{date_str}</span>',
                     unsafe_allow_html=True,
                 )
 
@@ -260,17 +357,25 @@ else:
                 if paper.authors:
                     authors_short = ", ".join(paper.authors[:3])
                     if len(paper.authors) > 3:
-                        authors_short += f" et al."
+                        authors_short += " et al."
                     st.caption(authors_short)
 
     # ---- 右栏: 论文详情面板 ----
     current_paper = next(p for p in papers if p.id == st.session_state.selected_paper_id)
 
     with col_detail:
-        # 标题
-        st.markdown(f"### {current_paper.title}")
+        # 标题行 + 收藏按钮
+        title_col, bookmark_col = st.columns([6, 1])
+        with title_col:
+            st.markdown(f"### {current_paper.title}")
+        with bookmark_col:
+            bm_label = "★ 已收藏" if current_paper.is_bookmarked else "☆ 收藏"
+            bm_type = "primary" if current_paper.is_bookmarked else "secondary"
+            if st.button(bm_label, key="toggle_bm", type=bm_type, use_container_width=True):
+                toggle_bookmark(current_paper.id)
+                st.rerun()
 
-        # Metadata chips
+        # Metadata chips + 评分条
         authors_str = ", ".join(current_paper.authors) if current_paper.authors else "Unknown"
         date_str = current_paper.published_date.strftime("%Y-%m-%d")
         badge_html = render_source_badge(current_paper.source)
@@ -280,6 +385,10 @@ else:
         if current_paper.doi:
             chips += f' <span class="meta-chip">DOI: {current_paper.doi}</span>'
         st.markdown(chips, unsafe_allow_html=True)
+
+        # 评分条
+        st.markdown(render_score_bar(current_paper.relevance_score), unsafe_allow_html=True)
+
         st.caption(f"**Authors:** {authors_str}")
 
         # 链接按钮

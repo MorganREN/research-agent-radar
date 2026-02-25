@@ -1,0 +1,244 @@
+# src/dashboard/pages/1_Scheduler.py
+import sys
+import os
+import time
+import subprocess
+
+# ban all warnings in this file since it's a dashboard page
+import warnings
+warnings.filterwarnings("ignore")
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
+
+import streamlit as st
+from datetime import datetime
+
+from src.research_agent.storage.models import create_db_and_tables
+from src.research_agent.scheduler.status import (
+    get_scheduler_state,
+    is_scheduler_alive,
+    get_recent_runs,
+    stop_run,
+)
+
+st.set_page_config(page_title="Scheduler - AI Research Agent", layout="wide", page_icon="🎓")
+
+# Ensure tables exist
+create_db_and_tables()
+
+# ============================
+# Custom CSS
+# ============================
+st.markdown("""
+<style>
+    .main .block-container { padding-top: 2rem; }
+
+    .status-card {
+        padding: 1.2rem 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+    .status-running {
+        background: linear-gradient(135deg, #E8F5E9, #C8E6C9);
+        border-left: 4px solid #4CAF50;
+    }
+    .status-stopped {
+        background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+        border-left: 4px solid #FF9800;
+    }
+    .status-dead {
+        background: linear-gradient(135deg, #FFEBEE, #FFCDD2);
+        border-left: 4px solid #F44336;
+    }
+
+    .run-row {
+        padding: 0.6rem 1rem;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+        border: 1px solid #E0E0E0;
+        background: #FAFAFA;
+    }
+    .run-status-completed { border-left: 3px solid #4CAF50; }
+    .run-status-running   { border-left: 3px solid #FF9800; }
+    .run-status-failed    { border-left: 3px solid #F44336; }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("## Scheduler")
+st.caption("Monitor and control the automated paper discovery pipeline")
+
+# ============================
+# Section 1: Scheduler Status
+# ============================
+st.markdown("### Status")
+
+state = get_scheduler_state()
+alive = is_scheduler_alive()
+
+if state and alive:
+    st.markdown(
+        '<div class="status-card status-running">'
+        '<strong style="color:#2E7D32;font-size:1.1rem;">RUNNING</strong>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Frequency", state.update_frequency)
+    with col2:
+        if state.next_run_at:
+            st.metric("Next Run", state.next_run_at.strftime("%Y-%m-%d %H:%M UTC"))
+        else:
+            st.metric("Next Run", "Running now...")
+    with col3:
+        st.metric("PID", str(state.pid))
+
+elif state and state.is_running and not alive:
+    # PID stale — scheduler crashed
+    st.markdown(
+        '<div class="status-card status-dead">'
+        '<strong style="color:#C62828;font-size:1.1rem;">STOPPED UNEXPECTEDLY</strong>'
+        '<br><span style="color:#666;font-size:0.85rem;">'
+        'The scheduler process is no longer running. Restart with: <code>poetry run radar</code>'
+        '</span></div>',
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        '<div class="status-card status-stopped">'
+        '<strong style="color:#E65100;font-size:1.1rem;">STOPPED</strong>'
+        '<br><span style="color:#666;font-size:0.85rem;">'
+        'Start with: <code>poetry run radar</code>'
+        '</span></div>',
+        unsafe_allow_html=True,
+    )
+
+st.divider()
+
+# ============================
+# Section 2: Manual Trigger
+# ============================
+st.markdown("### Manual Run")
+st.caption("Trigger a one-shot pipeline run without starting the daemon scheduler")
+
+# Check if there's a running task
+latest_runs = get_recent_runs(limit=1)
+has_running_run = latest_runs and latest_runs[0].status == "running"
+
+col_start, col_stop, col_info = st.columns([1, 1, 2])
+with col_start:
+    start_disabled = has_running_run
+    if st.button(
+        "Run Pipeline Now",
+        type="primary",
+        use_container_width=True,
+        disabled=start_disabled,
+    ):
+        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+        subprocess.Popen(
+            [sys.executable, os.path.join(project_root, "src/run.py"), "--once"],
+            cwd=project_root,
+        )
+        st.toast("Pipeline started in background!")
+        time.sleep(2)
+        st.rerun()
+
+with col_stop:
+    stop_disabled = not has_running_run
+    if st.button(
+        "Stop Running Task",
+        type="secondary",
+        use_container_width=True,
+        disabled=stop_disabled,
+    ):
+        if has_running_run:
+            success = stop_run(latest_runs[0].id)
+            if success:
+                st.toast("Task stopped.")
+            else:
+                st.toast("Failed to stop the task.")
+            time.sleep(1)
+            st.rerun()
+
+with col_info:
+    if has_running_run:
+        elapsed = datetime.utcnow() - latest_runs[0].started_at
+        mins = int(elapsed.total_seconds() // 60)
+        secs = int(elapsed.total_seconds() % 60)
+        st.warning(f"A pipeline run is in progress ({mins}m {secs}s elapsed)...")
+
+st.divider()
+
+# ============================
+# Section 3: Execution History
+# ============================
+st.markdown("### Execution History")
+
+runs = get_recent_runs(limit=20)
+
+if not runs:
+    st.info("No execution history yet. Run the pipeline to see results here.")
+else:
+    for run in runs:
+        # Status icon and color
+        if run.status == "completed":
+            icon = "✅"
+            css_class = "run-status-completed"
+        elif run.status == "running":
+            icon = "⏳"
+            css_class = "run-status-running"
+        else:
+            icon = "❌"
+            css_class = "run-status-failed"
+
+        # Duration
+        if run.completed_at and run.started_at:
+            duration = run.completed_at - run.started_at
+            minutes = int(duration.total_seconds() // 60)
+            seconds = int(duration.total_seconds() % 60)
+            duration_str = f"{minutes}m {seconds}s"
+        elif run.status == "running":
+            elapsed = datetime.utcnow() - run.started_at
+            minutes = int(elapsed.total_seconds() // 60)
+            seconds = int(elapsed.total_seconds() % 60)
+            duration_str = f"{minutes}m {seconds}s (running)"
+        else:
+            duration_str = "-"
+
+        # Trigger label
+        trigger_label = "Manual" if run.trigger == "manual" else "Scheduled"
+
+        # Build row HTML
+        started_str = run.started_at.strftime("%Y-%m-%d %H:%M")
+        stats_html = (
+            f'<span style="color:#666;font-size:0.82rem;">'
+            f'Found: <strong>{run.papers_found}</strong> &nbsp;|&nbsp; '
+            f'Relevant: <strong>{run.papers_relevant}</strong> &nbsp;|&nbsp; '
+            f'Analyzed: <strong>{run.papers_analyzed}</strong>'
+            f'</span>'
+        )
+        error_html = ""
+        if run.error_message:
+            error_html = (
+                f'<br><span style="color:#C62828;font-size:0.8rem;">'
+                f'Error: {run.error_message[:200]}</span>'
+            )
+
+        st.markdown(
+            f'<div class="run-row {css_class}">'
+            f'<span style="font-size:0.9rem;">{icon} <strong>{started_str}</strong>'
+            f' &nbsp;·&nbsp; {trigger_label}'
+            f' &nbsp;·&nbsp; {duration_str}</span>'
+            f'<br>{stats_html}'
+            f'{error_html}'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+
+# ============================
+# Auto-refresh while a run is in progress
+# ============================
+if runs and runs[0].status == "running":
+    time.sleep(10)
+    st.rerun()

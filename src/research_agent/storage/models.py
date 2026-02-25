@@ -33,6 +33,31 @@ class Paper(SQLModel, table=True):
     download_status: str = "pending"
     analysis_report: Optional[str] = None  # LLM 生成的分析报告
 
+
+class SchedulerState(SQLModel, table=True):
+    """Singleton row tracking live scheduler process state."""
+    id: int = Field(default=1, primary_key=True)
+    is_running: bool = False
+    pid: Optional[int] = None
+    started_at: Optional[datetime] = None
+    next_run_at: Optional[datetime] = None
+    update_frequency: str = "Every 24 hours"
+
+
+class SchedulerRun(SQLModel, table=True):
+    """One row per pipeline execution (history log)."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None
+    status: str = "running"           # running | completed | failed
+    pid: Optional[int] = None         # OS PID of the pipeline process
+    papers_found: int = 0
+    papers_relevant: int = 0
+    papers_analyzed: int = 0
+    error_message: Optional[str] = None
+    trigger: str = "scheduled"        # scheduled | manual
+
+
 # 创建一个本地 SQLite 数据库用于测试
 sqlite_file_name = "database.db"
 sqlite_url = f"sqlite:///{sqlite_file_name}"

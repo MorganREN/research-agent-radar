@@ -25,14 +25,25 @@ def _ensure_columns():
         ("relevance_score", "INTEGER"),
         ("is_bookmarked", "BOOLEAN DEFAULT 0"),
     ]
+    # scheduler run table migration
+    scheduler_migrations = [
+        ("schedulerrun", "pid", "INTEGER"),
+    ]
     with engine.connect() as conn:
         for col_name, col_def in migrations:
             try:
                 conn.execute(text(f"ALTER TABLE paper ADD COLUMN {col_name} {col_def}"))
                 conn.commit()
-                logger.info(f"Added column: {col_name}")
+                logger.info(f"Added column: paper.{col_name}")
             except Exception:
-                pass  # 列已存在
+                pass  # column already exists
+        for table, col_name, col_def in scheduler_migrations:
+            try:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}"))
+                conn.commit()
+                logger.info(f"Added column: {table}.{col_name}")
+            except Exception:
+                pass  # column already exists
 
 
 def process_uploaded_pdf(file_path: str) -> dict:

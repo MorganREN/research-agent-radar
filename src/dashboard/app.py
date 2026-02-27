@@ -148,33 +148,34 @@ else:
     with col_list:
         st.markdown(render_paper_list_header(len(papers)), unsafe_allow_html=True)
 
-        for paper in papers:
-            is_selected = (paper.id == st.session_state.selected_paper_id)
+        with st.container(height=650):
+            for paper in papers:
+                is_selected = (paper.id == st.session_state.selected_paper_id)
 
-            with st.container(border=True):
-                row_html = render_paper_card_row(
-                    is_selected=is_selected,
-                    dot=render_status_dot(paper, st.session_state.analyzing_papers),
-                    badge=render_source_badge(paper.source),
-                    score_badge=render_score_badge(paper.relevance_score),
-                    star=render_bookmark_star(paper.is_bookmarked),
-                    date_str=paper.published_date.strftime("%Y-%m-%d"),
-                )
-                st.markdown(row_html, unsafe_allow_html=True)
+                with st.container(border=True):
+                    row_html = render_paper_card_row(
+                        is_selected=is_selected,
+                        dot=render_status_dot(paper, st.session_state.analyzing_papers),
+                        badge=render_source_badge(paper.source),
+                        score_badge=render_score_badge(paper.relevance_score),
+                        star=render_bookmark_star(paper.is_bookmarked),
+                        date_str=paper.published_date.strftime("%Y-%m-%d"),
+                    )
+                    st.markdown(row_html, unsafe_allow_html=True)
 
-                display_title = paper.title if len(paper.title) <= 120 else paper.title[:117] + "..."
-                with st.container():
-                    st.markdown('<div class="paper-card-btn">', unsafe_allow_html=True)
-                    if st.button(display_title, key=f"sel_{paper.id}", use_container_width=True):
-                        st.session_state.selected_paper_id = paper.id
-                        st.rerun()
-                    st.markdown('</div>', unsafe_allow_html=True)
+                    display_title = paper.title if len(paper.title) <= 120 else paper.title[:117] + "..."
+                    with st.container():
+                        st.markdown('<div class="paper-card-btn">', unsafe_allow_html=True)
+                        if st.button(display_title, key=f"sel_{paper.id}", use_container_width=True):
+                            st.session_state.selected_paper_id = paper.id
+                            st.rerun()
+                        st.markdown('</div>', unsafe_allow_html=True)
 
-                if paper.authors:
-                    authors_short = ", ".join(paper.authors[:3])
-                    if len(paper.authors) > 3:
-                        authors_short += " et al."
-                    st.caption(authors_short)
+                    if paper.authors:
+                        authors_short = ", ".join(paper.authors[:3])
+                        if len(paper.authors) > 3:
+                            authors_short += " et al."
+                        st.caption(authors_short)
 
     # ---- 右栏: 论文详情面板 ----
     current_paper = next(p for p in papers if p.id == st.session_state.selected_paper_id)
@@ -190,33 +191,34 @@ else:
                 toggle_bookmark(current_paper.id)
                 st.rerun()
 
-        authors_str = ", ".join(current_paper.authors) if current_paper.authors else "Unknown"
-        metadata_html = render_detail_metadata(
-            badge_html=render_source_badge(current_paper.source),
-            date_str=current_paper.published_date.strftime("%Y-%m-%d"),
-            doi=current_paper.doi,
-            score_bar_html=render_score_bar(current_paper.relevance_score),
-            authors_str=authors_str,
-        )
-        st.markdown(metadata_html, unsafe_allow_html=True)
+        with st.container(height=650):
+            authors_str = ", ".join(current_paper.authors) if current_paper.authors else "Unknown"
+            metadata_html = render_detail_metadata(
+                badge_html=render_source_badge(current_paper.source),
+                date_str=current_paper.published_date.strftime("%Y-%m-%d"),
+                doi=current_paper.doi,
+                score_bar_html=render_score_bar(current_paper.relevance_score),
+                authors_str=authors_str,
+            )
+            st.markdown(metadata_html, unsafe_allow_html=True)
 
-        if current_paper.url:
-            st.link_button("🔗 View Original", current_paper.url)
+            if current_paper.url:
+                st.link_button("🔗 View Original", current_paper.url)
 
-        st.divider()
+            st.divider()
 
-        tab1, tab2 = st.tabs(["📊 Deep Analysis Report", "📝 Abstract"])
+            tab1, tab2 = st.tabs(["📊 Deep Analysis Report", "📝 Abstract"])
 
-        with tab1:
-            if current_paper.analysis_report:
-                st.markdown(current_paper.analysis_report)
-            elif current_paper.id in st.session_state.analyzing_papers:
-                st.info("⏳ This paper is being analyzed in the background. The report will be displayed automatically when complete...")
-            else:
-                st.info("🚧 This paper has not yet generated a detailed report (waiting for Analyst Agent to process...)")
+            with tab1:
+                if current_paper.analysis_report:
+                    st.markdown(current_paper.analysis_report)
+                elif current_paper.id in st.session_state.analyzing_papers:
+                    st.info("⏳ This paper is being analyzed in the background. The report will be displayed automatically when complete...")
+                else:
+                    st.info("🚧 This paper has not yet generated a detailed report (waiting for Analyst Agent to process...)")
 
-        with tab2:
-            st.markdown(current_paper.abstract)
+            with tab2:
+                st.markdown(current_paper.abstract)
 
 
 # ============================

@@ -242,3 +242,29 @@ hr {
     border-top: 1px solid var(--color-border);
     margin: var(--space-lg) 0;
 }
+
+/* ========== 双栏独立滚动 ========== */
+/* 覆盖 st.container(height=650) 的固定高度为视口响应式 */
+[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"][style*="height"] {
+    height: calc(100vh - 280px) !important;
+    min-height: 400px;
+}
+
+/* 滚动区域内的滚动条美化 */
+[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] > div {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-gray-lighter) transparent;
+}
+[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] > div::-webkit-scrollbar {
+    width: 6px;
+}
+[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] > div::-webkit-scrollbar-track {
+    background: transparent;
+}
+[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] > div::-webkit-scrollbar-thumb {
+    background-color: var(--color-gray-lighter);
+    border-radius: 3px;
+}
+[data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] > div::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-brand-primary);
+}

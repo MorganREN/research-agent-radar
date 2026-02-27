@@ -1,0 +1,10 @@
+/* ========== 侧栏标题样式 ========== */
+[data-testid="sidebar"] [data-testid="stMarkdownContainer"] h3 {
+    border-bottom: 2px solid #0D7EFF;
+    padding-bottom: 0.75rem;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+}
+[data-testid="sidebar"] [data-testid="stMarkdownContainer"] h3:first-of-type {
+    margin-top: 0;
+}

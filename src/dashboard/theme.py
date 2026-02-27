@@ -1,10 +1,10 @@
 # src/dashboard/theme.py
-# 主题常量：颜色、标签映射、评分色板
+# 主题常量：颜色、标签映射、评分色板（学术风格 — 降饱和）
 
 SOURCE_COLORS = {
-    "arxiv": "#B71C1C",
-    "uploaded_pdf": "#1565C0",
-    "asce": "#2E7D32",
+    "arxiv": "#8B2500",        # 砖红
+    "uploaded_pdf": "#1B2A4A",  # 深海军蓝
+    "asce": "#2D5F3F",         # 深鼠尾草
 }
 
 SOURCE_LABELS = {
@@ -13,17 +13,17 @@ SOURCE_LABELS = {
     "asce": "ASCE",
 }
 
-# Palette for dynamically-assigned elsevier journal colors
+# Palette for dynamically-assigned elsevier journal colors (muted)
 ELSEVIER_COLORS = [
-    "#E65100", "#6A1B9A", "#00695C", "#AD1457",
-    "#283593", "#4E342E", "#37474F", "#0277BD",
+    "#8B4513", "#5B3A6B", "#2D5F3F", "#7A3B4E",
+    "#1B2A4A", "#4A3728", "#3A4A52", "#2A5A7A",
 ]
 
 SCORE_COLORS = {
-    (9, 10): "#1B5E20",  # Deep green
-    (7, 8):  "#4CAF50",  # Green
-    (5, 6):  "#F9A825",  # Yellow
-    (3, 4):  "#E65100",  # Orange
-    (1, 2):  "#C62828",  # Red
+    (9, 10): "#1B4332",  # 深森林绿
+    (7, 8):  "#3D7A5F",  # 鼠尾草绿
+    (5, 6):  "#B8860B",  # 学术金
+    (3, 4):  "#A0522D",  # 赭石
+    (1, 2):  "#A63D40",  # 暗红
 }
-SCORE_COLOR_NONE = "#9E9E9E"  # Gray
+SCORE_COLOR_NONE = "#A0A0A8"  # 暖灰

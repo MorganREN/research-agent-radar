@@ -20,47 +20,50 @@ from src.research_agent.scheduler.status import (
     get_recent_runs,
     stop_run,
 )
+from src.dashboard.styles import inject_css
 
-st.set_page_config(page_title="Scheduler - AI Research Agent", layout="wide", page_icon="🎓")
+st.set_page_config(page_title="Scheduler — PaperFlow.AI", layout="wide", page_icon="📖")
 
 # Ensure tables exist
 create_db_and_tables()
 
 # ============================
-# Custom CSS
+# 共享 CSS + Scheduler 专用样式
 # ============================
+inject_css()
+
 st.markdown("""
 <style>
-    .main .block-container { padding-top: 2rem; }
-
     .status-card {
-        padding: 1.2rem 1.5rem;
-        border-radius: 8px;
+        padding: 1.25rem 1.5rem;
+        border-radius: 6px;
         margin-bottom: 1rem;
+        font-family: 'Inter', -apple-system, sans-serif;
     }
     .status-running {
-        background: linear-gradient(135deg, #E8F5E9, #C8E6C9);
-        border-left: 4px solid #4CAF50;
+        background: #F0F5EF;
+        border-left: 3px solid #3D7A5F;
     }
     .status-stopped {
-        background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
-        border-left: 4px solid #FF9800;
+        background: #FDF6E3;
+        border-left: 3px solid #B8860B;
     }
     .status-dead {
-        background: linear-gradient(135deg, #FFEBEE, #FFCDD2);
-        border-left: 4px solid #F44336;
+        background: #F9EEEE;
+        border-left: 3px solid #A63D40;
     }
 
     .run-row {
-        padding: 0.6rem 1rem;
-        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        border-radius: 4px;
         margin-bottom: 0.5rem;
-        border: 1px solid #E0E0E0;
-        background: #FAFAFA;
+        border: 1px solid #E5E2DC;
+        background: #FAF8F5;
+        font-family: 'Inter', -apple-system, sans-serif;
     }
-    .run-status-completed { border-left: 3px solid #4CAF50; }
-    .run-status-running   { border-left: 3px solid #FF9800; }
-    .run-status-failed    { border-left: 3px solid #F44336; }
+    .run-status-completed { border-left: 3px solid #3D7A5F; }
+    .run-status-running   { border-left: 3px solid #B8860B; }
+    .run-status-failed    { border-left: 3px solid #A63D40; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -78,7 +81,7 @@ alive = is_scheduler_alive()
 if state and alive:
     st.markdown(
         '<div class="status-card status-running">'
-        '<strong style="color:#2E7D32;font-size:1.1rem;">RUNNING</strong>'
+        '<strong style="color:#3D7A5F;font-size:1.1rem;">RUNNING</strong>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -97,8 +100,8 @@ elif state and state.is_running and not alive:
     # PID stale — scheduler crashed
     st.markdown(
         '<div class="status-card status-dead">'
-        '<strong style="color:#C62828;font-size:1.1rem;">STOPPED UNEXPECTEDLY</strong>'
-        '<br><span style="color:#666;font-size:0.85rem;">'
+        '<strong style="color:#A63D40;font-size:1.1rem;">STOPPED UNEXPECTEDLY</strong>'
+        '<br><span style="color:#6B6B73;font-size:0.85rem;">'
         'The scheduler process is no longer running. Restart with: <code>poetry run radar</code>'
         '</span></div>',
         unsafe_allow_html=True,
@@ -106,8 +109,8 @@ elif state and state.is_running and not alive:
 else:
     st.markdown(
         '<div class="status-card status-stopped">'
-        '<strong style="color:#E65100;font-size:1.1rem;">STOPPED</strong>'
-        '<br><span style="color:#666;font-size:0.85rem;">'
+        '<strong style="color:#8B4513;font-size:1.1rem;">STOPPED</strong>'
+        '<br><span style="color:#6B6B73;font-size:0.85rem;">'
         'Start with: <code>poetry run radar</code>'
         '</span></div>',
         unsafe_allow_html=True,
@@ -182,13 +185,13 @@ else:
     for run in runs:
         # Status icon and color
         if run.status == "completed":
-            icon = "✅"
+            icon = "&#10003;"
             css_class = "run-status-completed"
         elif run.status == "running":
-            icon = "⏳"
+            icon = "&#9679;"
             css_class = "run-status-running"
         else:
-            icon = "❌"
+            icon = "&#10007;"
             css_class = "run-status-failed"
 
         # Duration
@@ -211,7 +214,7 @@ else:
         # Build row HTML
         started_str = run.started_at.strftime("%Y-%m-%d %H:%M")
         stats_html = (
-            f'<span style="color:#666;font-size:0.82rem;">'
+            f'<span style="color:#6B6B73;font-size:0.82rem;">'
             f'Found: <strong>{run.papers_found}</strong> &nbsp;|&nbsp; '
             f'Relevant: <strong>{run.papers_relevant}</strong> &nbsp;|&nbsp; '
             f'Analyzed: <strong>{run.papers_analyzed}</strong>'
@@ -220,7 +223,7 @@ else:
         error_html = ""
         if run.error_message:
             error_html = (
-                f'<br><span style="color:#C62828;font-size:0.8rem;">'
+                f'<br><span style="color:#A63D40;font-size:0.8rem;">'
                 f'Error: {run.error_message[:200]}</span>'
             )
 

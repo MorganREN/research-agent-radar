@@ -28,7 +28,7 @@ from pathlib import Path
 # ============================
 # 页面配置 & 样式注入
 # ============================
-st.set_page_config(page_title="PaperFlow.AI", layout="wide", page_icon="🚀")
+st.set_page_config(page_title="PaperFlow.AI", layout="wide", page_icon="📖")
 inject_css()
 
 # ============================
@@ -55,7 +55,7 @@ if "selected_paper_id" not in st.session_state:
 # Sidebar
 # ============================
 with st.sidebar:
-    st.markdown("### 🔍 Filter and Sort")
+    st.markdown("### Filter & Sort")
 
     all_sources = get_distinct_sources()
     filter_source = st.multiselect(
@@ -69,7 +69,7 @@ with st.sidebar:
     st.divider()
 
     # --- PDF Upload ---
-    st.markdown("### 📤 Upload PDF Papers")
+    st.markdown("### Upload Papers")
     uploaded_files = st.file_uploader("Select PDF files", type="pdf", accept_multiple_files=True)
 
     new_files = [f for f in uploaded_files if f.name not in st.session_state.processed_uploads]
@@ -103,7 +103,7 @@ with st.sidebar:
     # --- 后台分析任务状态 ---
     if st.session_state.analyzing_papers:
         st.divider()
-        st.markdown("### ⏳ Background Analysis Tasks")
+        st.markdown("### Analysis Tasks")
         completed = []
         for pid in list(st.session_state.analyzing_papers.keys()):
             status = get_analysis_status(pid)
@@ -142,7 +142,7 @@ else:
     if st.session_state.selected_paper_id not in [p.id for p in papers]:
         st.session_state.selected_paper_id = papers[0].id
 
-    col_list, col_detail = st.columns([2, 5])
+    col_list, col_detail = st.columns([3, 7])
 
     # ---- 左栏: 论文卡片列表 ----
     with col_list:
@@ -203,11 +203,11 @@ else:
             st.markdown(metadata_html, unsafe_allow_html=True)
 
             if current_paper.url:
-                st.link_button("🔗 View Original", current_paper.url)
+                st.link_button("View Original", current_paper.url)
 
             st.divider()
 
-            tab1, tab2 = st.tabs(["📊 Deep Analysis Report", "📝 Abstract"])
+            tab1, tab2 = st.tabs(["Analysis Report", "Abstract"])
 
             with tab1:
                 if current_paper.analysis_report:

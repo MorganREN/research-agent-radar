@@ -103,7 +103,7 @@ with st.sidebar:
     # --- 后台分析任务状态 ---
     if st.session_state.analyzing_papers:
         st.divider()
-        st.markdown("### Analysis Tasks")
+        st.markdown("### Analysis Tasks", unsafe_allow_html=True)
         completed = []
         for pid in list(st.session_state.analyzing_papers.keys()):
             status = get_analysis_status(pid)
@@ -211,14 +211,14 @@ else:
 
             with tab1:
                 if current_paper.analysis_report:
-                    st.markdown(current_paper.analysis_report)
+                    st.markdown(current_paper.analysis_report, unsafe_allow_html=True)
                 elif current_paper.id in st.session_state.analyzing_papers:
-                    st.info("⏳ This paper is being analyzed in the background. The report will be displayed automatically when complete...")
+                    st.info("This paper is being analyzed in the background. The report will be displayed automatically when complete.")
                 else:
-                    st.info("🚧 This paper has not yet generated a detailed report (waiting for Analyst Agent to process...)")
+                    st.info("This paper has not yet generated a detailed report (waiting for Analyst Agent to process).")
 
             with tab2:
-                st.markdown(current_paper.abstract)
+                st.markdown(current_paper.abstract, unsafe_allow_html=True)
 
 
 # ============================

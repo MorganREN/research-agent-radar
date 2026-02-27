@@ -18,7 +18,7 @@ import streamlit as st
 from pathlib import Path
 
 # 页面配置
-st.set_page_config(page_title="AI Research Agent", layout="wide", page_icon="🎓")
+st.set_page_config(page_title="PaperFlow.AI", layout="wide", page_icon="🚀")
 
 # ============================
 # 常量
@@ -187,11 +187,11 @@ def render_source_badge(source: str) -> str:
 
 def render_status_dot(paper, analyzing_set: dict) -> str:
     if paper.analysis_report:
-        return '<span class="status-dot status-analyzed" title="已分析"></span>'
+        return '<span class="status-dot status-analyzed" title="Analyzed"></span>'
     elif paper.id in analyzing_set:
-        return '<span class="status-dot status-analyzing" title="分析中"></span>'
+        return '<span class="status-dot status-analyzing" title="Analyzing"></span>'
     else:
-        return '<span class="status-dot status-pending" title="待分析"></span>'
+        return '<span class="status-dot status-pending" title="Pending analysis"></span>'
 
 
 def render_score_badge(score) -> str:
@@ -204,7 +204,7 @@ def render_score_badge(score) -> str:
 def render_score_bar(score) -> str:
     """渲染详情面板的评分条。"""
     if score is None:
-        return '<div class="score-bar-container"><span class="score-bar-label" style="color:#9E9E9E;">评分: N/A</span></div>'
+        return '<div class="score-bar-container"><span class="score-bar-label" style="color:#9E9E9E;">Score: N/A</span></div>'
     filled_color = get_score_color(score)
     empty_color = "#E0E0E0"
     segments = ""
@@ -221,15 +221,15 @@ def render_score_bar(score) -> str:
 
 def render_bookmark_star(is_bookmarked: bool) -> str:
     if is_bookmarked:
-        return '<span class="bookmark-star" title="已收藏">★</span>'
+        return '<span class="bookmark-star" title="Bookmarked">★</span>'
     return ""
 
 
 # ============================
 # 初始化
 # ============================
-st.markdown("## 🎓 自动化学术情报局")
-st.caption("Your AI-Powered Research Assistant")
+st.markdown("## 🚀 PaperFlow.AI")
+st.caption("Intelligent Research Assistant")
 
 initialize_database()
 
@@ -250,7 +250,7 @@ if "selected_paper_id" not in st.session_state:
 # Sidebar
 # ============================
 with st.sidebar:
-    st.header("🔍 筛选与排序")
+    st.header("🔍 Filter and Sort")
 
     def _source_label(s: str) -> str:
         if s in SOURCE_LABELS:
@@ -260,17 +260,17 @@ with st.sidebar:
         return s
 
     all_sources = get_distinct_sources()
-    filter_source = st.multiselect("来源平台", options=all_sources, default=[], format_func=_source_label)
-    show_only_relevant = st.checkbox("只看高相关 (Relevant)", value=True)
-    show_bookmarked_only = st.checkbox("⭐ 只看收藏", value=False)
-    sort_by = st.selectbox("排序方式", ["按日期排序", "按评分排序"], index=0)
-    sort_key = "score" if sort_by == "按评分排序" else "date"
+    filter_source = st.multiselect("Source Platforms", options=all_sources, default=[], format_func=_source_label)
+    show_only_relevant = st.checkbox("Show only high relevance (Relevant)", value=True)
+    show_bookmarked_only = st.checkbox("⭐ Show only bookmarks", value=False)
+    sort_by = st.selectbox("Sort By", ["Sort by date", "Sort by score"], index=0)
+    sort_key = "score" if sort_by == "Sort by score" else "date"
 
     st.divider()
 
     # --- PDF Upload ---
-    st.header("📤 上传 PDF 论文")
-    uploaded_files = st.file_uploader("选择 PDF 文件", type="pdf", accept_multiple_files=True)
+    st.header("📤 Upload PDF Papers")
+    uploaded_files = st.file_uploader("Select PDF files", type="pdf", accept_multiple_files=True)
 
     new_files = [f for f in uploaded_files if f.name not in st.session_state.processed_uploads]
 
@@ -279,7 +279,7 @@ with st.sidebar:
         Path(data_dir).mkdir(parents=True, exist_ok=True)
 
         submitted = 0
-        with st.spinner(f"正在提取 {len(new_files)} 篇论文元数据..."):
+        with st.spinner(f"Extracting metadata for {len(new_files)} papers..."):
             for uf in new_files:
                 st.session_state.processed_uploads.add(uf.name)
                 file_path = os.path.join(data_dir, uf.name)
@@ -297,24 +297,24 @@ with st.sidebar:
                     submitted += 1
 
         if submitted > 0:
-            st.success(f"元数据提取完成，{submitted} 篇论文已提交后台分析（最多 3 篇并行）")
+            st.success(f"Metadata extraction complete, {submitted} papers submitted for background analysis (max 3 in parallel)")
             st.rerun()
 
     # --- 后台分析任务状态 ---
     if st.session_state.analyzing_papers:
         st.divider()
-        st.markdown("##### ⏳ 后台分析任务")
+        st.markdown("##### ⏳ Background Analysis Tasks")
         completed = []
         for pid in list(st.session_state.analyzing_papers.keys()):
             status = get_analysis_status(pid)
             if status == "running":
-                st.info(f"正在分析: `{pid}`")
+                st.info(f"Analyzing: `{pid}`")
             elif status == "done":
-                st.success(f"分析完成: `{pid}`")
+                st.success(f"Analysis complete: `{pid}`")
                 clear_analysis_status(pid)
                 completed.append(pid)
             elif status == "error":
-                st.error(f"分析失败: `{pid}`")
+                st.error(f"Analysis failed: `{pid}`")
                 clear_analysis_status(pid)
                 completed.append(pid)
             else:
@@ -323,7 +323,7 @@ with st.sidebar:
             st.session_state.analyzing_papers.pop(pid, None)
 
     st.divider()
-    st.caption("数据每24小时自动更新")
+    st.caption("Data updates automatically every 24 hours")
 
 
 # ============================
@@ -337,7 +337,7 @@ papers = load_papers(
 )
 
 if not papers:
-    st.info("暂无数据，请先运行 `main_demo.py` 抓取论文，或在侧边栏上传 PDF。")
+    st.info("No data available. Please run `main_demo.py` to fetch papers, or upload PDFs in the sidebar.")
 else:
     # 如果没有选中论文或选中的论文不在列表中，默认选第一篇
     if st.session_state.selected_paper_id not in [p.id for p in papers]:
@@ -347,7 +347,7 @@ else:
 
     # ---- 左栏: 论文卡片列表 ----
     with col_list:
-        st.markdown(f"#### 📄 论文列表 ({len(papers)})")
+        st.markdown(f"#### 📄 Paper List ({len(papers)})")
 
         for paper in papers:
             is_selected = (paper.id == st.session_state.selected_paper_id)
@@ -391,7 +391,7 @@ else:
         with title_col:
             st.markdown(f"### {current_paper.title}")
         with bookmark_col:
-            bm_label = "★ 已收藏" if current_paper.is_bookmarked else "☆ 收藏"
+            bm_label = "★ Bookmarked" if current_paper.is_bookmarked else "☆ Bookmark"
             bm_type = "primary" if current_paper.is_bookmarked else "secondary"
             if st.button(bm_label, key="toggle_bm", type=bm_type, use_container_width=True):
                 toggle_bookmark(current_paper.id)
@@ -415,20 +415,20 @@ else:
 
         # 链接按钮
         if current_paper.url:
-            st.link_button("🔗 查看原文", current_paper.url)
+            st.link_button("🔗 View Original", current_paper.url)
 
         st.divider()
 
-        # 选项卡
-        tab1, tab2 = st.tabs(["📊 深度分析报告", "📝 原始摘要"])
+        # Tabs
+        tab1, tab2 = st.tabs(["📊 Deep Analysis Report", "📝 Abstract"])
 
         with tab1:
             if current_paper.analysis_report:
                 st.markdown(current_paper.analysis_report)
             elif current_paper.id in st.session_state.analyzing_papers:
-                st.info("⏳ 该论文正在后台分析中，完成后会自动显示报告...")
+                st.info("⏳ This paper is being analyzed in the background. The report will be displayed automatically when complete...")
             else:
-                st.info("🚧 该论文尚未生成详细报告 (等待 Analyst Agent 处理...)")
+                st.info("🚧 This paper has not yet generated a detailed report (waiting for Analyst Agent to process...)")
 
         with tab2:
             st.markdown(current_paper.abstract)

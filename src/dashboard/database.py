@@ -4,7 +4,7 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-# 将项目根目录加入 python path
+# Add project root directory to python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from sqlmodel import Session, select, SQLModel, col
@@ -14,15 +14,15 @@ from src.research_agent.agents.analysis.extracter import PDFUploadParser
 from src.research_agent.agents.analysis.reviewer import PaperReviewer
 from loguru import logger
 
-# --- 后台分析任务管理 ---
-# 状态: "running" | "done" | "error"
+# --- Background analysis task management ---
+# Status: "running" | "done" | "error"
 _analysis_tasks: dict[str, str] = {}
 _tasks_lock = threading.Lock()
 _analysis_executor = ThreadPoolExecutor(max_workers=3)
 
 
 def _ensure_columns():
-    """为已有的 paper 表添加新增列（SQLite 安全，列已存在时忽略）。"""
+    """Add new columns to existing paper table (SQLite safe, ignore if column exists)."""
     migrations = [
         ("relevance_score", "INTEGER"),
         ("is_bookmarked", "BOOLEAN DEFAULT 0"),
@@ -49,28 +49,28 @@ def _ensure_columns():
 
 
 def process_uploaded_pdf(file_path: str) -> dict:
-    """仅解析 PDF 元数据并存入数据库（不执行深度分析）。"""
+    """Only parse PDF metadata and store in database (no deep analysis)."""
     parser = PDFUploadParser()
     try:
         paper = parser.parse_info(file_path)
         if not paper:
-            logger.error("PDF 解析失败，无法提取论文信息。")
-            return {"error": "PDF 解析失败，无法提取论文信息。"}
-        logger.info(f"论文元数据提取完成: {paper.title}")
-        return {"message": "PDF 元数据解析完成", "paper_id": paper.id}
+            logger.error("PDF parsing failed, unable to extract paper information.")
+            return {"error": "PDF parsing failed, unable to extract paper information."}
+        logger.info(f"Paper metadata extraction complete: {paper.title}")
+        return {"message": "PDF metadata parsing complete", "paper_id": paper.id}
     except Exception as e:
-        logger.error(f"处理上传 PDF 时出错: {e}")
-        return {"error": f"处理上传 PDF 时出错: {e}"}
+        logger.error(f"Error processing uploaded PDF: {e}")
+        return {"error": f"Error processing uploaded PDF: {e}"}
 
 
 def _run_analysis_background(paper_id: str, file_path: str):
-    """后台线程：对论文执行深度分析，完成后写入数据库。"""
+    """Background thread: execute deep analysis on papers, write to database when complete."""
     try:
         reviewer = PaperReviewer()
         with Session(engine) as session:
             paper = session.get(Paper, paper_id)
             if not paper:
-                logger.error(f"后台分析: 论文 {paper_id} 不存在")
+                logger.error(f"Background analysis: Paper {paper_id} not found")
                 with _tasks_lock:
                     _analysis_tasks[paper_id] = "error"
                 return
@@ -78,38 +78,38 @@ def _run_analysis_background(paper_id: str, file_path: str):
             paper.analysis_report = report
             session.add(paper)
             session.commit()
-            logger.info(f"后台分析完成: {paper.title}")
+            logger.info(f"Background analysis complete: {paper.title}")
         with _tasks_lock:
             _analysis_tasks[paper_id] = "done"
     except Exception as e:
-        logger.error(f"后台分析出错 ({paper_id}): {e}")
+        logger.error(f"Background analysis error ({paper_id}): {e}")
         with _tasks_lock:
             _analysis_tasks[paper_id] = "error"
 
 
 def start_background_analysis(paper_id: str, file_path: str):
-    """提交论文深度分析到线程池（最多 3 篇并行）。"""
+    """Submit paper deep analysis to thread pool (max 3 in parallel)."""
     with _tasks_lock:
         if _analysis_tasks.get(paper_id) == "running":
-            return  # 已在运行
+            return  # Already running
         _analysis_tasks[paper_id] = "running"
     _analysis_executor.submit(_run_analysis_background, paper_id, file_path)
 
 
 def get_analysis_status(paper_id: str) -> str | None:
-    """查询后台分析状态: 'running' | 'done' | 'error' | None"""
+    """Query background analysis status: 'running' | 'done' | 'error' | None"""
     with _tasks_lock:
         return _analysis_tasks.get(paper_id)
 
 
 def clear_analysis_status(paper_id: str):
-    """清除已完成/失败的任务状态。"""
+    """Clear completed/failed task status."""
     with _tasks_lock:
         _analysis_tasks.pop(paper_id, None)
 
 
 def has_running_tasks() -> bool:
-    """是否有正在运行的后台分析任务。"""
+    """Check if there are any running background analysis tasks."""
     with _tasks_lock:
         return any(v == "running" for v in _analysis_tasks.values())
 
@@ -127,7 +127,7 @@ def get_distinct_sources() -> list[str]:
 
 
 def toggle_bookmark(paper_id: str) -> bool:
-    """切换论文的收藏状态，返回新的 is_bookmarked 值。"""
+    """Toggle paper bookmark status, return new is_bookmarked value."""
     with Session(engine) as session:
         paper = session.get(Paper, paper_id)
         if not paper:
@@ -183,7 +183,7 @@ def load_papers(
             if show_bookmarked_only:
                 statement = statement.where(Paper.is_bookmarked == True)
 
-            # 排序
+            # Sorting
             if sort_by == "score":
                 statement = statement.order_by(
                     col(Paper.relevance_score).desc().nulls_last(),

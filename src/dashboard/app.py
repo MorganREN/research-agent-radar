@@ -57,6 +57,8 @@ if "selected_paper_id" not in st.session_state:
 with st.sidebar:
     st.markdown("### Filter & Sort")
 
+    search_query = st.text_input("Search by title", placeholder="Enter keywords...")
+
     all_sources = get_distinct_sources()
     filter_source = st.multiselect(
         "Source Platforms", options=all_sources, default=[], format_func=source_label,
@@ -135,6 +137,10 @@ papers = load_papers(
     sort_by=sort_key,
     show_bookmarked_only=show_bookmarked_only,
 )
+
+if search_query:
+    search_lower = search_query.lower()
+    papers = [p for p in papers if search_lower in p.title.lower()]
 
 if not papers:
     st.info("No data available. Please run `main_demo.py` to fetch papers, or upload PDFs in the sidebar.")

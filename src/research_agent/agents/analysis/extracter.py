@@ -41,7 +41,7 @@ The output should be a JSON object with the above fields. If any field is not fo
         full_text = self.parser.parse_to_markdown(pdf_path)
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.1",
                 messages=[
                     {"role": "system", "content": parse_prompt},
                     {"role": "user", "content": f"论文全文内容:\n{full_text[:10000]}"} # 截取前1w字符防溢出

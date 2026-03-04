@@ -161,7 +161,7 @@ class PaperReviewer:
         )
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.1",
                 messages=[
                     {"role": "system", "content": synthesis_system},
                     {"role": "user", "content": user_content}
@@ -196,7 +196,7 @@ class PaperReviewer:
             logger.info(f"论文长度 {len(full_text)} 字符，直接分析。")
             try:
                 response = self.client.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-5.1",
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": f"## Paper Metadata\n{metadata}\n\n## Full Text\n{full_text}"}

@@ -145,10 +145,10 @@ def init_config_form():
                         with st.expander("📋 View Generated Prompt Template"):
                             st.markdown(prompt_template)
                         
-                        st.info("Next step: Execute `python main_demo.py` to crawl and populate the database.")
+                        st.info("Next step: Execute `poetry run radar` to crawl and populate the database.")
                         st.stop()
                     else:
                         st.error("❌ Failed to save the prompt template. Please try again.")
 
-                st.info("Next step: Execute `python main_demo.py` to crawl and populate the database.")
+                st.info("Next step: Execute `poetry run radar` to crawl and populate the database.")
                 st.stop()

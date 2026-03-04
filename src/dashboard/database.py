@@ -198,3 +198,16 @@ def load_papers(
     except Exception as e:
         logger.error(f"Error loading papers: {e}")
         return []
+
+
+def load_all_papers() -> list:
+    """加载所有论文，按 fetched_date 降序排列。"""
+    try:
+        with Session(engine) as session:
+            statement = select(Paper).order_by(
+                Paper.fetched_date.desc().nulls_last()
+            )
+            return session.exec(statement).all()
+    except Exception as e:
+        logger.error(f"Error loading all papers: {e}")
+        return []

@@ -72,12 +72,17 @@
 
 /* ========== 全局样式 ========== */
 .main .block-container {
-    padding-top: 2.5rem;
+    padding-top: 1.5rem;
     font-family: var(--font-body);
     font-size: var(--font-size-base);
     line-height: var(--line-height-base);
     color: var(--color-text-primary);
     background-color: var(--color-bg-warm);
+}
+
+/* Hide default Streamlit header chrome for a cleaner top navbar */
+header[data-testid="stHeader"] {
+    background: transparent;
 }
 
 /* ========== 来源 Badge ========== */

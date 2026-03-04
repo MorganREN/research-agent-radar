@@ -1,7 +1,7 @@
 # src/research_agent/agents/scout/arxiv_scout.py
 import arxiv
 from src.research_agent.storage.models import Paper
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from loguru import logger
 
 
@@ -23,7 +23,7 @@ class ArxivScout:
 
     def _build_date_query(self) -> str:
         """将日期范围拼接到查询中，使用 arXiv submittedDate 语法。"""
-        end = datetime.utcnow()
+        end = datetime.now(timezone.utc).replace(tzinfo=None)
         start = end - timedelta(days=self.days_back)
         start_str = start.strftime("%Y%m%d") + "000000"
         end_str = end.strftime("%Y%m%d") + "235959"
@@ -43,7 +43,7 @@ class ArxivScout:
             sort_by=arxiv.SortCriterion.SubmittedDate,
         )
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         papers_found = []
         for result in client.results(search):
             # 将 arXiv 原生对象转换为我们的数据库模型

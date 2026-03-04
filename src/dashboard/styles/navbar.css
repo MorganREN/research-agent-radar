@@ -1,0 +1,70 @@
+/* ========== Top Navigation Bar ========== */
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--color-brand-primary);
+    padding: 0.85rem 2rem;
+    border-radius: var(--radius-md);
+    margin-bottom: 2rem;
+    border-bottom: 3px solid var(--color-accent);
+}
+
+.topbar-brand {
+    display: flex;
+    flex-direction: column;
+}
+
+.topbar-logo {
+    color: var(--color-bg-warm);
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: var(--letter-spacing-heading);
+    line-height: 1.2;
+}
+
+.topbar-subtitle {
+    color: rgba(250, 248, 245, 0.6);
+    font-family: var(--font-body);
+    font-size: 0.72rem;
+    font-weight: 400;
+    letter-spacing: var(--letter-spacing-caps);
+    text-transform: uppercase;
+    margin-top: 0.15rem;
+}
+
+.topbar-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.topbar-nav-item {
+    color: rgba(250, 248, 245, 0.92);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    padding: 0.45rem 1rem;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.02em;
+    transition: var(--transition-base);
+}
+
+.topbar-nav-item:hover {
+    color: var(--color-bg-warm);
+    background: rgba(250, 248, 245, 0.15);
+    text-decoration: none;
+}
+
+.topbar-nav-active {
+    color: var(--color-bg-warm) !important;
+    background: rgba(184, 134, 11, 0.35);
+    border-bottom: 2px solid var(--color-accent);
+    font-weight: 600;
+}
+
+.topbar-nav-active:hover {
+    background: rgba(184, 134, 11, 0.45);
+}

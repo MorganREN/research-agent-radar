@@ -1,4 +1,5 @@
-# src/dashboard/pages/1_Scheduler.py
+# src/dashboard/pages/pipeline.py
+"""Pipeline — Monitor and control the automated paper discovery pipeline."""
 import sys
 import os
 import time
@@ -11,7 +12,7 @@ warnings.filterwarnings("ignore")
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.research_agent.storage.models import create_db_and_tables
 from src.research_agent.scheduler.status import (
@@ -20,18 +21,13 @@ from src.research_agent.scheduler.status import (
     get_recent_runs,
     stop_run,
 )
-from src.dashboard.styles import inject_css
-
-st.set_page_config(page_title="Scheduler — PaperFlow.AI", layout="wide", page_icon="📖")
 
 # Ensure tables exist
 create_db_and_tables()
 
 # ============================
-# 共享 CSS + Scheduler 专用样式
+# Pipeline 专用样式
 # ============================
-inject_css()
-
 st.markdown("""
 <style>
     .status-card {
@@ -67,7 +63,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("## Scheduler")
+st.markdown("## Pipeline")
 st.caption("Monitor and control the automated paper discovery pipeline")
 
 # ============================
@@ -165,7 +161,7 @@ with col_stop:
 
 with col_info:
     if has_running_run:
-        elapsed = datetime.utcnow() - latest_runs[0].started_at
+        elapsed = datetime.now(timezone.utc).replace(tzinfo=None) - latest_runs[0].started_at
         mins = int(elapsed.total_seconds() // 60)
         secs = int(elapsed.total_seconds() % 60)
         st.warning(f"A pipeline run is in progress ({mins}m {secs}s elapsed)...")
@@ -201,7 +197,7 @@ else:
             seconds = int(duration.total_seconds() % 60)
             duration_str = f"{minutes}m {seconds}s"
         elif run.status == "running":
-            elapsed = datetime.utcnow() - run.started_at
+            elapsed = datetime.now(timezone.utc).replace(tzinfo=None) - run.started_at
             minutes = int(elapsed.total_seconds() // 60)
             seconds = int(elapsed.total_seconds() % 60)
             duration_str = f"{minutes}m {seconds}s (running)"

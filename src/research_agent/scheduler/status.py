@@ -1,7 +1,7 @@
 # src/research_agent/scheduler/status.py
 import os
 import signal
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlmodel import Session, select
@@ -59,7 +59,7 @@ def is_scheduler_alive() -> bool:
 def create_run(trigger: str = "scheduled") -> SchedulerRun:
     """Insert a new run record with status 'running'."""
     run = SchedulerRun(
-        started_at=datetime.utcnow(),
+        started_at=datetime.now(timezone.utc).replace(tzinfo=None),
         status="running",
         pid=os.getpid(),
         trigger=trigger,
@@ -84,7 +84,7 @@ def complete_run(
         if run is None:
             return
         run.status = "completed"
-        run.completed_at = datetime.utcnow()
+        run.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         run.papers_found = papers_found
         run.papers_relevant = papers_relevant
         run.papers_analyzed = papers_analyzed
@@ -103,7 +103,7 @@ def fail_run(run_id: int, error_message: str) -> None:
         if run is None:
             return
         run.status = "failed"
-        run.completed_at = datetime.utcnow()
+        run.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         run.error_message = error_message
         session.add(run)
         session.commit()
@@ -146,7 +146,7 @@ def stop_run(run_id: int) -> bool:
             return False
 
         run.status = "failed"
-        run.completed_at = datetime.utcnow()
+        run.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         run.error_message = "Manually stopped by user"
         session.add(run)
         session.commit()

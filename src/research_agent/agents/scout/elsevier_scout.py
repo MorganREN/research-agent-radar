@@ -164,7 +164,7 @@ class ElsevierScout:
                     doi=item.get('prism:doi'),
                     full_text_content=full_text_content,
                     download_status="downloaded",
-                    fetched_date=dt.datetime.utcnow(),
+                    fetched_date=dt.datetime.now(dt.timezone.utc).replace(tzinfo=None),
                 )
                 papers.append(paper)
 

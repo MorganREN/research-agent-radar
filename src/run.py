@@ -13,7 +13,7 @@ import os
 import argparse
 import signal
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Ensure project root is on sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -79,8 +79,8 @@ def main():
     update_scheduler_state(
         is_running=True,
         pid=os.getpid(),
-        started_at=datetime.utcnow(),
-        next_run_at=datetime.utcnow(),
+        started_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        next_run_at=datetime.now(timezone.utc).replace(tzinfo=None),
         frequency=frequency_str,
     )
 
@@ -96,7 +96,7 @@ def main():
             except Exception as e:
                 logger.error(f"Pipeline run failed: {e}")
 
-            next_run = datetime.utcnow() + interval
+            next_run = datetime.now(timezone.utc).replace(tzinfo=None) + interval
             update_scheduler_state(
                 is_running=True,
                 pid=os.getpid(),

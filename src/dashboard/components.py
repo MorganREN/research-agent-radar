@@ -103,32 +103,40 @@ def render_bookmark_star(is_bookmarked: bool) -> str:
 # ============================
 
 def render_hero_header() -> str:
-    """顶部品牌横幅 — 学术风格。"""
-    return """
-    <div style="
-        background: #1B2A4A;
-        padding: 1.75rem 2rem;
-        border-radius: 6px;
-        margin-bottom: 2rem;
-        border-bottom: 3px solid #B8860B;
-    ">
-        <h1 style="
-            color: #FAF8F5;
-            margin: 0;
-            font-family: 'Playfair Display', Georgia, serif;
-            font-size: 1.75rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-        ">PaperFlow.AI</h1>
-        <p style="
-            color: rgba(250, 248, 245, 0.7);
-            margin: 0.35rem 0 0 0;
-            font-family: 'Inter', sans-serif;
-            font-size: 0.85rem;
-            font-weight: 400;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-        ">Intelligent Research Assistant</p>
+    """顶部品牌横幅 — 学术风格。(Deprecated: use render_top_navbar instead)"""
+    return render_top_navbar("")
+
+
+# ============================
+# 顶部导航栏
+# ============================
+
+_NAV_PAGES = [
+    ("Library",  "/",          "📚"),
+    ("Pipeline", "/pipeline",  "⚙️"),
+    ("Insights", "/insights",  "📊"),
+]
+
+
+def render_top_navbar(current_page_title: str) -> str:
+    """Top navigation bar with logo on left and page tabs on right."""
+    nav_items = ""
+    for label, url, icon in _NAV_PAGES:
+        active_class = "topbar-nav-active" if label == current_page_title else ""
+        nav_items += (
+            f'<a href="{url}" target="_parent" class="topbar-nav-item {active_class}">'
+            f'{icon} {label}</a>'
+        )
+
+    return f"""
+    <div class="topbar">
+        <div class="topbar-brand">
+            <span class="topbar-logo">PaperFlow.AI</span>
+            <span class="topbar-subtitle">Intelligent Research Assistant</span>
+        </div>
+        <nav class="topbar-nav">
+            {nav_items}
+        </nav>
     </div>
     """
 

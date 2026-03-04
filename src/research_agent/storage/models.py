@@ -1,6 +1,6 @@
 # src/research_agent/storage/models.py
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlmodel import Field, SQLModel, JSON, create_engine
 
 class Paper(SQLModel, table=True):
@@ -19,7 +19,7 @@ class Paper(SQLModel, table=True):
     full_text_content: Optional[str] = None  # elsevier可能存储全文文本
     
     # 系统状态 (Data Ingestion 核心字段)
-    discovered_at: datetime = Field(default_factory=datetime.utcnow)
+    discovered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     fetched_date: Optional[datetime] = None  # 本次拉取/入库的日期
     
     # 筛选结果
@@ -48,7 +48,7 @@ class SchedulerState(SQLModel, table=True):
 class SchedulerRun(SQLModel, table=True):
     """One row per pipeline execution (history log)."""
     id: Optional[int] = Field(default=None, primary_key=True)
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     completed_at: Optional[datetime] = None
     status: str = "running"           # running | completed | failed
     pid: Optional[int] = None         # OS PID of the pipeline process

@@ -13,7 +13,7 @@
 import sys
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -45,7 +45,7 @@ def main():
     cursor.execute("SELECT id, source, published_date, fetched_date FROM paper")
     rows = cursor.fetchall()
 
-    today_str = datetime.utcnow().isoformat()
+    today_str = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     updated = 0
     skipped = 0
 

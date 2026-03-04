@@ -1,15 +1,14 @@
-# src/dashboard/pages/2_Daily_Feed.py
-"""Daily Feed — 按拉取日期分组展示论文 + 学术风格统计图表。"""
+# src/dashboard/pages/insights.py
+"""Insights — paper feed grouped by fetch date + interactive charts."""
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from collections import defaultdict, Counter
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
 
 import streamlit as st
 
-from src.dashboard.styles import inject_css
 from src.dashboard.database import load_all_papers, initialize_database
 from src.dashboard.components import (
     render_source_badge,
@@ -20,10 +19,7 @@ from src.dashboard.components import (
 from src.dashboard.theme import CHART_COLORS, CHART_ELSEVIER_COLORS
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Daily Feed — PaperFlow.AI", layout="wide", page_icon="📖")
-
 initialize_database()
-inject_css()
 
 # ============================
 # 页面专用样式
@@ -85,6 +81,20 @@ st.markdown("""
         line-height: 1.55;
         margin-top: 0.5rem;
     }
+    .feed-abstract-expand summary {
+        list-style: none;
+        cursor: pointer;
+    }
+    .feed-abstract-expand summary::-webkit-details-marker { display: none; }
+    .feed-abstract-expand summary .abstract-expanded { display: none; }
+    .feed-abstract-expand[open] summary .abstract-collapsed { display: none; }
+    .feed-abstract-expand[open] summary .abstract-expanded { display: inline; }
+    .feed-abstract-toggle {
+        color: #B8860B;
+        font-size: 0.75rem;
+        font-style: italic;
+        margin-left: 0.25rem;
+    }
     .feed-stats {
         font-family: 'Inter', sans-serif;
         font-size: 0.82rem;
@@ -101,7 +111,7 @@ st.markdown("""
 # ============================
 # 标题
 # ============================
-st.markdown("## Daily Feed")
+st.markdown("## Insights")
 st.caption("Papers grouped by fetch date, with source statistics")
 
 
@@ -240,8 +250,8 @@ def plotly_source_pie(papers: list, title: str = "All Sources", center_label: st
 # ============================
 with st.sidebar:
     st.markdown("### Feed Options")
-    show_abstract = st.checkbox("Show abstracts", value=False)
-    filter_relevant = st.checkbox("Relevant only", value=False)
+    show_abstract = st.checkbox("Show abstracts", value=True)
+    filter_relevant = st.checkbox("Relevant only", value=True)
 
     all_papers = load_all_papers()
 
@@ -277,7 +287,7 @@ sorted_days = sorted(grouped.keys(), reverse=True)
 # 汇总统计
 # ============================
 total = len(papers)
-today_key = datetime.utcnow().strftime("%Y-%m-%d")
+today_key = datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d")
 today_count = len(grouped.get(today_key, []))
 
 st.markdown(
@@ -342,8 +352,18 @@ for day in sorted_days:
 
         abstract_html = ""
         if show_abstract and p.abstract:
-            short = p.abstract[:250] + "..." if len(p.abstract) > 250 else p.abstract
-            abstract_html = f'<div class="feed-abstract">{short}</div>'
+            if len(p.abstract) > 250:
+                short = p.abstract[:250] + "..."
+                abstract_html = (
+                    f'<details class="feed-abstract-expand">'
+                    f'<summary class="feed-abstract">'
+                    f'<span class="abstract-collapsed">{short} <span class="feed-abstract-toggle">&#9656; show more</span></span>'
+                    f'<span class="abstract-expanded">{p.abstract} <span class="feed-abstract-toggle">&#9652; show less</span></span>'
+                    f'</summary>'
+                    f'</details>'
+                )
+            else:
+                abstract_html = f'<div class="feed-abstract">{p.abstract}</div>'
 
         relevance_tag = ""
         if p.is_relevant is True:

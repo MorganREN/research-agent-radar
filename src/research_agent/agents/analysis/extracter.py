@@ -70,7 +70,7 @@ The output should be a JSON object with the above fields. If any field is not fo
                 is_relevant=True,  # 默认上传的论文都相关
                 relevance_score=10,  # 用户主动上传的论文，相关度满分
                 download_status="downloaded",
-                fetched_date=dt.datetime.utcnow(),
+                fetched_date=dt.datetime.now(dt.timezone.utc).replace(tzinfo=None),
             )
 
             logger.info(f"✅ 成功解析并存储论文: {paper.title}")

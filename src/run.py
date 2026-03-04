@@ -25,17 +25,13 @@ from src.research_agent.scheduler.runner import run_pipeline_from_config, _load_
 from src.research_agent.scheduler.status import update_scheduler_state
 
 
-FREQUENCY_MAP = {
-    "Every 6 hours": timedelta(hours=6),
-    "Every 12 hours": timedelta(hours=12),
-    "Every 24 hours": timedelta(hours=24),
-    "Weekly": timedelta(weeks=1),
-}
-
-
-def parse_frequency(freq_str: str) -> timedelta:
-    """Convert config frequency string to timedelta."""
-    return FREQUENCY_MAP.get(freq_str, timedelta(hours=24))
+def _next_scheduled_time(hour: int = 8, minute: int = 0) -> datetime:
+    """Return the next occurrence of HH:MM in local time (naive datetime)."""
+    now = datetime.now()
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if now >= target:
+        target += timedelta(days=1)
+    return target
 
 
 def main():
@@ -63,8 +59,9 @@ def main():
 
     # --- Daemon mode: recurring scheduled runs ---
     config = _load_user_config()
-    frequency_str = config.get("update_frequency", "Every 24 hours")
-    interval = parse_frequency(frequency_str)
+    scheduled_time_str = config.get("scheduled_time", "08:00")
+    hour, minute = (int(x) for x in scheduled_time_str.split(":"))
+    frequency_str = f"Daily at {scheduled_time_str}"
 
     stop_event = threading.Event()
 
@@ -85,7 +82,7 @@ def main():
     )
 
     logger.info(
-        f"Scheduler started (PID={os.getpid()}, frequency={frequency_str}). "
+        f"Scheduler started (PID={os.getpid()}, schedule={frequency_str}). "
         f"Press Ctrl+C to stop."
     )
 
@@ -96,17 +93,20 @@ def main():
             except Exception as e:
                 logger.error(f"Pipeline run failed: {e}")
 
-            next_run = datetime.now(timezone.utc).replace(tzinfo=None) + interval
+            next_local = _next_scheduled_time(hour, minute)
+            wait_seconds = (next_local - datetime.now()).total_seconds()
+            # Store next_run as naive UTC for dashboard display
+            next_run_utc = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=wait_seconds)
             update_scheduler_state(
                 is_running=True,
                 pid=os.getpid(),
-                next_run_at=next_run,
+                next_run_at=next_run_utc,
                 frequency=frequency_str,
             )
-            logger.info(f"Next run scheduled at {next_run.strftime('%Y-%m-%d %H:%M UTC')}")
+            logger.info(f"Next run scheduled at {next_local.strftime('%Y-%m-%d %H:%M')} (local)")
 
-            # Wait for the interval or until stop signal
-            stop_event.wait(timeout=interval.total_seconds())
+            # Wait until the scheduled time or until stop signal
+            stop_event.wait(timeout=wait_seconds)
     finally:
         update_scheduler_state(is_running=False, pid=None)
         logger.info("Scheduler stopped.")

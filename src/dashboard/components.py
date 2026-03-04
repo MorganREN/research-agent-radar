@@ -212,7 +212,7 @@ def render_detail_metadata(
     authors_str: str,
 ) -> str:
     """详情面板的元数据卡片 — 学术风格，区分 Published / Fetched 日期。"""
-    doi_chip = f'<span class="meta-chip">DOI: {doi}</span>' if doi else ""
+    doi_chip = f'<span class="meta-chip">DOI: {doi}</span>' if doi else None
     return f"""
     <div style="
         background: #FAF8F5;

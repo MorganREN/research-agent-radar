@@ -26,10 +26,10 @@ def run_ingestion_pipeline():
     
     # 3. 初始化 Agents
     # 3.1 搜索 arXiv 的土木工程(cs.CE) 和 人工智能(cs.AI) 板块
-    arxiv_scout = ArxivScout(query="cat:cs.CE OR cat:cs.AI", max_results=10)
+    arxiv_scout = ArxivScout(query="cat:cs.CE OR cat:cs.AI", days_back=7)
     # 3.2 搜索 Elsevier 的指定期刊
     elsevier_scout = ElsevierScout(
-        max_results=5,
+        max_results=30,
         year=2026
     )
 

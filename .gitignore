@@ -214,3 +214,4 @@ src/research_agent/config/analysis_prompt.yaml
 
 .vscode/
 poetry.lock
+.DS_Store

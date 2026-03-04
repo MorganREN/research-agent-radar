@@ -56,11 +56,12 @@ def _build_scouts(config: dict) -> list:
 
     if "arxiv" in sources:
         query = _build_arxiv_query(fields)
-        scouts.append(ArxivScout(query=query, max_results=10))
+        days_back = config.get("arxiv_days_back", 7)
+        scouts.append(ArxivScout(query=query, days_back=days_back))
 
     if "sciencedirect" in sources:
         scouts.append(ElsevierScout(
-            max_results=5,
+            max_results=30,
             year=datetime.now().year,
         ))
 

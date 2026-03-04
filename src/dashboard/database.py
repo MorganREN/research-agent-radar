@@ -187,10 +187,10 @@ def load_papers(
             if sort_by == "score":
                 statement = statement.order_by(
                     col(Paper.relevance_score).desc().nulls_last(),
-                    Paper.published_date.desc(),
+                    Paper.fetched_date.desc().nulls_last(),
                 )
             else:
-                statement = statement.order_by(Paper.published_date.desc())
+                statement = statement.order_by(Paper.fetched_date.desc().nulls_last())
 
             papers = session.exec(statement).all()
             logger.info(f"Loaded {len(papers)} papers from database")

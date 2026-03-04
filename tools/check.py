@@ -50,11 +50,13 @@ def main():
         print(f"  ID:        {p.id}")
         print(f"  Source:    {p.source}    Score: {score_str}    Relevant: {relevant_str}{bookmark}")
         print(f"  Date:      {p.published_date.strftime('%Y-%m-%d')}    DOI: {p.doi or '—'}")
+        print(f"  Fetched:   {p.fetched_date.strftime('%Y-%m-%d') if p.fetched_date else '—'}")
         print(f"  Authors:   {authors_str}")
         print(f"  Report:    {has_report}    Download: {p.download_status}")
         print(f"  URL:       {p.url}")
         print(f"  Abstract:  {p.abstract[:120]}..." if len(p.abstract) > 120 else f"  Abstract:  {p.abstract}")
         print("-" * 72)
+        break
 
 
 if __name__ == "__main__":

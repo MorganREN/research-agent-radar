@@ -197,13 +197,14 @@ def render_detail_title(title: str) -> str:
 def render_detail_metadata(
     *,
     badge_html: str,
-    date_str: str,
+    published_date_str: str,
+    fetched_date_str: str,
     doi: str | None,
     score_bar_html: str,
     authors_str: str,
 ) -> str:
-    """详情面板的元数据卡片 — 学术风格。"""
-    doi_chip = f'<span class="meta-chip">DOI: {doi}</span>' if doi else None
+    """详情面板的元数据卡片 — 学术风格，区分 Published / Fetched 日期。"""
+    doi_chip = f'<span class="meta-chip">DOI: {doi}</span>' if doi else ""
     return f"""
     <div style="
         background: #FAF8F5;
@@ -214,7 +215,8 @@ def render_detail_metadata(
     ">
         <div style="margin-bottom: 0.75rem;">
             {badge_html}
-            <span class="meta-chip">{date_str}</span>
+            <span class="meta-chip">Published: {published_date_str}</span>
+            <span class="meta-chip">Fetched: {fetched_date_str}</span>
             {doi_chip}
         </div>
         <div style="margin-bottom: 0.75rem;">

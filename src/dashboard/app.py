@@ -165,7 +165,7 @@ else:
                         badge=render_source_badge(paper.source),
                         score_badge=render_score_badge(paper.relevance_score),
                         star=render_bookmark_star(paper.is_bookmarked),
-                        date_str=paper.published_date.strftime("%Y-%m-%d"),
+                        date_str=paper.fetched_date.strftime("%Y-%m-%d") if paper.fetched_date else "—",
                     )
                     st.markdown(row_html, unsafe_allow_html=True)
 
@@ -201,7 +201,8 @@ else:
             authors_str = ", ".join(current_paper.authors) if current_paper.authors else "Unknown"
             metadata_html = render_detail_metadata(
                 badge_html=render_source_badge(current_paper.source),
-                date_str=current_paper.published_date.strftime("%Y-%m-%d"),
+                published_date_str=current_paper.published_date.strftime("%Y-%m-%d"),
+                fetched_date_str=current_paper.fetched_date.strftime("%Y-%m-%d") if current_paper.fetched_date else "—",
                 doi=current_paper.doi,
                 score_bar_html=render_score_bar(current_paper.relevance_score),
                 authors_str=authors_str,

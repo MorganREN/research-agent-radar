@@ -163,7 +163,8 @@ class ElsevierScout:
                     is_oa=None,    # Elsevier 论文的开放获取状态需要额外判断
                     doi=item.get('prism:doi'),
                     full_text_content=full_text_content,
-                    download_status="downloaded"
+                    download_status="downloaded",
+                    fetched_date=dt.datetime.utcnow(),
                 )
                 papers.append(paper)
 

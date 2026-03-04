@@ -20,6 +20,7 @@ class Paper(SQLModel, table=True):
     
     # 系统状态 (Data Ingestion 核心字段)
     discovered_at: datetime = Field(default_factory=datetime.utcnow)
+    fetched_date: Optional[datetime] = None  # 本次拉取/入库的日期
     
     # 筛选结果
     is_relevant: Optional[bool] = None  # True/False/None(未处理)

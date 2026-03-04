@@ -43,6 +43,7 @@ class ArxivScout:
             sort_by=arxiv.SortCriterion.SubmittedDate,
         )
 
+        now = datetime.utcnow()
         papers_found = []
         for result in client.results(search):
             # 将 arXiv 原生对象转换为我们的数据库模型
@@ -57,6 +58,7 @@ class ArxivScout:
                 is_oa=True,
                 doi=result.doi if result.doi else None,
                 full_text_content=None,
+                fetched_date=now,
             )
             papers_found.append(paper)
 

@@ -9,12 +9,17 @@ from loguru import logger
 import yaml
 import datetime as dt
 
-load_dotenv() # 加载 .env 中的 API KEY
+load_dotenv()
+CONFIG_MODEL = "kimi-k2.5"
+KIMI_BASE_URL = "https://api.moonshot.cn/v1"
 
 class PDFUploadParser:
     def __init__(self):
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.parser = PDFParser() # 引用上面的解析器
+        self.client = OpenAI(
+            api_key=os.getenv("KIMI_API_KEY"),
+            base_url=KIMI_BASE_URL,
+        )
+        self.parser = PDFParser()
 
     def refresh_database(self, paper: Paper):
         """将解析后的论文信息存储到数据库中"""
@@ -41,11 +46,12 @@ The output should be a JSON object with the above fields. If any field is not fo
         full_text = self.parser.parse_to_markdown(pdf_path)
         try:
             response = self.client.chat.completions.create(
-                model="gpt-5.1",
+                model=CONFIG_MODEL,
                 messages=[
                     {"role": "system", "content": parse_prompt},
-                    {"role": "user", "content": f"论文全文内容:\n{full_text[:10000]}"} # 截取前1w字符防溢出
-                ]
+                    {"role": "user", "content": f"论文全文内容:\n{full_text[:50000]}"}
+                ],
+                response_format={"type": "json_object"},
             )
             print(f"📑 提取到的论文信息: {response.choices[0].message.content}")
             raw_reponse = response.choices[0].message.content

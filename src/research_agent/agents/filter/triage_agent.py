@@ -9,7 +9,9 @@ from loguru import logger
 import yaml
 from pathlib import Path
 
-load_dotenv() # 加载 .env 中的 API KEY
+load_dotenv()
+CONFIG_MODEL = "qwen-plus"
+QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 DEFAULT_INSTRUCTION = """
 你是一个严谨的学术助手。请根据用户的【研究领域画像】，判断给定的论文是否值得深入阅读。
@@ -30,7 +32,10 @@ DEFAULT_PROFILE = """
 
 class RelevanceFilter:
     def __init__(self, research_interests: str):
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.client = OpenAI(
+            api_key=os.getenv("QWEN_API_KEY"),
+            base_url=QWEN_BASE_URL,
+        )
         self.interests = self._load_research_interests()
 
     def _load_research_interests(self) -> str:
@@ -89,7 +94,7 @@ class RelevanceFilter:
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini", # 使用轻量级模型以降低成本
+                model=CONFIG_MODEL, # 使用轻量级模型以降低成本
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )

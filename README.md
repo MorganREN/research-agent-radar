@@ -1,6 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/OpenAI-GPT--5.1-412991?logo=openai&logoColor=white" />
+  <img src="https://img.shields.io/badge/Kimi-K2.5-6C5CE7?logo=data:image/svg+xml;base64,&logoColor=white" />
+  <img src="https://img.shields.io/badge/Qwen-Plus-FF6B35?logoColor=white" />
   <img src="https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B?logo=streamlit&logoColor=white" />
   <img src="https://img.shields.io/badge/License-MIT-B8860B" />
 </p>
@@ -9,15 +10,15 @@
 
 > 🤖 An autonomous multi-agent system that discovers, filters, analyzes, and visualizes academic papers — so you can focus on *reading*, not *searching*.
 
-PaperFlow.AI monitors arXiv and ScienceDirect around the clock, uses GPT models to score relevance and generate structured analysis reports, and presents everything in an elegant academic-themed dashboard.
+PaperFlow.AI monitors arXiv and ScienceDirect around the clock, uses LLM agents (Kimi K2.5 + Qwen-Plus) to score relevance and generate structured analysis reports, and presents everything in an elegant academic-themed dashboard.
 
 ---
 
 ## ✨ Highlights
 
 - 🔍 **Multi-source discovery** — Automatically fetches papers from **arXiv** and **ScienceDirect** (Elsevier)
-- 🧠 **LLM-powered relevance scoring** — GPT-4o-mini rates every paper 1–10 against your research interests
-- 📝 **Deep analysis reports** — GPT-5.1 generates comprehensive structured reports with Map-Reduce for long papers
+- 🧠 **LLM-powered relevance scoring** — Qwen-Plus rates every paper 1–10 against your research interests
+- 📝 **Deep analysis reports** — Kimi K2.5 (128K context) generates comprehensive structured reports; Map-Reduce fallback for extreme cases
 - ⏰ **Scheduled automation** — Daemon process runs the full pipeline every 6h / 12h / 24h / weekly
 - 📊 **Interactive dashboard** — Plotly charts, daily feed, source distribution, trend lines — all in real-time
 - 📤 **PDF upload & analysis** — Drag-and-drop your own PDFs for instant metadata extraction and deep analysis
@@ -43,7 +44,7 @@ PaperFlow.AI monitors arXiv and ScienceDirect around the clock, uses GPT models 
                           ┌────────▼─────────┐
                           │  🧠 Filter Phase  │
                           │ RelevanceFilter   │
-                          │ (GPT-4o-mini)     │
+                          │ (Qwen-Plus)       │
                           │ Score: 1-10       │
                           └────────┬─────────┘
                                    │
@@ -56,9 +57,9 @@ PaperFlow.AI monitors arXiv and ScienceDirect around the clock, uses GPT models 
                           ┌────────▼─────────┐
                           │  📝 Analysis      │
                           │  PaperReviewer    │
-                          │  (GPT-5.1)        │
-                          │  Map-Reduce for   │
-                          │  long papers      │
+                          │  (Kimi K2.5)      │
+                          │  128K context     │
+                          │  + Map-Reduce     │
                           └────────┬─────────┘
                                    │
               ┌────────────────────▼────────────────────┐
@@ -80,11 +81,11 @@ PaperFlow.AI monitors arXiv and ScienceDirect around the clock, uses GPT models 
 |-------|-------|------|
 | **ArxivScout** | — | Fetches latest papers from arXiv by category & date range |
 | **ElsevierScout** | — | Searches ScienceDirect journals, parses XML full text to Markdown |
-| **RelevanceFilter** | GPT-4o-mini | Scores title + abstract against your research interests (1–10) |
+| **RelevanceFilter** | Qwen-Plus | Scores title + abstract against your research interests (1–10) |
 | **DownloadManager** | — | Downloads PDFs via HTTP (arXiv) or browser automation (authenticated) |
-| **PaperReviewer** | GPT-5.1 | Generates structured deep-analysis reports; Map-Reduce for long papers |
-| **PDFUploadParser** | GPT-5.1 | Extracts metadata from user-uploaded PDFs |
-| **PromptAgent** | GPT-5-mini | Auto-generates analysis prompt templates tailored to your domain |
+| **PaperReviewer** | Kimi K2.5 | Generates structured deep-analysis reports; 128K context, Map-Reduce fallback |
+| **PDFUploadParser** | Kimi K2.5 | Extracts metadata from user-uploaded PDFs (50K char context) |
+| **PromptAgent** | Qwen-Plus | Auto-generates analysis prompt templates tailored to your domain |
 
 ---
 
@@ -131,8 +132,11 @@ poetry install
 Create a `.env` file in the project root:
 
 ```bash
-# Required — powers all LLM agents
-OPENAI_API_KEY=sk-your-openai-api-key
+# Required — powers analysis & PDF parsing (Kimi / Moonshot AI)
+KIMI_API_KEY=your-kimi-api-key
+
+# Required — powers relevance filtering & prompt generation (Qwen / Dashscope)
+QWEN_API_KEY=your-qwen-api-key
 
 # Optional — only needed for ScienceDirect source
 ELSEVIER_API_KEY=your-elsevier-api-key
@@ -235,7 +239,8 @@ update_frequency: Every 24 hours
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPENAI_API_KEY` | ✅ Yes | OpenAI API key for GPT-5.1 / GPT-4o-mini |
+| `KIMI_API_KEY` | ✅ Yes | Moonshot AI API key for Kimi K2.5 (analysis & PDF parsing) |
+| `QWEN_API_KEY` | ✅ Yes | Dashscope API key for Qwen-Plus (relevance filtering & prompt generation) |
 | `ELSEVIER_API_KEY` | ❌ Optional | Elsevier API key for ScienceDirect access |
 
 ---
@@ -245,7 +250,7 @@ update_frequency: Every 24 hours
 | Component | Technology |
 |-----------|------------|
 | 🐍 Language | Python 3.12+ |
-| 🧠 LLM | OpenAI GPT-5.1, GPT-5-mini, GPT-4o-mini |
+| 🧠 LLM | Kimi K2.5 (Moonshot AI, 128K context), Qwen-Plus (Dashscope) |
 | 💾 ORM | SQLModel + SQLAlchemy |
 | 🗄️ Database | SQLite (zero-config) |
 | 🖥️ Dashboard | Streamlit |

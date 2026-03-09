@@ -4,10 +4,15 @@ from loguru import logger
 import os
 
 load_dotenv()
+CONFIG_MODEL = "qwen-plus"
+QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 class PromptAgent:
     def __init__(self):
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.client = OpenAI(
+            api_key=os.getenv("QWEN_API_KEY"),
+            base_url=QWEN_BASE_URL,
+        )
 
     def generate_prompt(self, fields: list) -> str:
         '''
@@ -36,7 +41,7 @@ Format your response as a clear, standalone prompt that can be directly used. Ex
 """
         try:
             response = self.client.chat.completions.create(
-                model="gpt-5-mini",
+                model=CONFIG_MODEL,
                 messages=[{"role": "user", "content": generation_prompt}],
             )
             prompt_template = response.choices[0].message.content

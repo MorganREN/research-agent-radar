@@ -4,7 +4,7 @@ from loguru import logger
 import os
 
 load_dotenv()
-CONFIG_MODEL = "qwen-plus"
+CONFIG_MODEL = "qwen3.5-flash"
 QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 
 class PromptAgent:

@@ -4,6 +4,11 @@ import os
 from loguru import logger
 from src.research_agent.storage.models import Paper
 from src.research_agent.agents.analysis.parser import PDFParser
+from src.research_agent.llm.kimi import (
+    KIMI_BASE_URL,
+    build_kimi_extra_body,
+    extract_response_content,
+)
 from dotenv import load_dotenv
 import yaml
 from pathlib import Path
@@ -14,7 +19,7 @@ load_dotenv()
 # ── 模型配置 ──────────────────────────────────────────────────────
 # Kimi K2.5 支持 128K token 上下文窗口，绝大多数学术论文全文可一次性送入
 CONFIG_MODEL = "kimi-k2.5"
-KIMI_BASE_URL = "https://api.moonshot.cn/v1"
+KIMI_EXTRA_BODY = build_kimi_extra_body(CONFIG_MODEL, KIMI_BASE_URL)
 
 # 直接分析上限：~200K 字符 ≈ ~50-60K tokens（为 prompt + 回复预留空间）
 # Kimi K2.5 的 128K 窗口足以覆盖几乎所有学术论文
@@ -101,6 +106,9 @@ class PaperReviewer:
             logger.warning(f"⚠️ Error loading config: {e}, using DEFAULT_PROMPT")
         return DEFAULT_PROMPT
 
+    def _extract_final_content(self, response) -> str:
+        return extract_response_content(response)
+
     # ── 切块（仅 fallback 使用）────────────────────────────────────
     def _split_into_chunks(self, text: str) -> List[str]:
         """按段落边界切块，尽量保持大块以减少信息损失。"""
@@ -130,8 +138,9 @@ class PaperReviewer:
                     {"role": "system", "content": CHUNK_EXTRACTION_PROMPT},
                     {"role": "user", "content": f"[Paper segment {idx + 1}/{total}]\n\n{chunk}"},
                 ],
+                extra_body=KIMI_EXTRA_BODY,
             )
-            return response.choices[0].message.content
+            return self._extract_final_content(response)
         except Exception as e:
             logger.warning(f"提取第 {idx + 1} 块关键信息失败: {e}")
             return f"[Segment {idx + 1} extraction failed: {e}]"
@@ -184,8 +193,9 @@ class PaperReviewer:
                         f"## Extracted Key Points from Full Text\n\n{combined}"
                     )},
                 ],
+                extra_body=KIMI_EXTRA_BODY,
             )
-            return response.choices[0].message.content
+            return self._extract_final_content(response)
         except Exception as e:
             return f"LLM 汇总分析出错: {e}"
 
@@ -229,8 +239,9 @@ class PaperReviewer:
                             f"## Full Text\n{full_text}"
                         )},
                     ],
+                    extra_body=KIMI_EXTRA_BODY,
                 )
-                return response.choices[0].message.content
+                return self._extract_final_content(response)
             except Exception as e:
                 return f"LLM 分析出错: {e}"
         else:

@@ -10,7 +10,8 @@ from src.dashboard.database import (
     initialize_database, check_database_initialized, load_papers,
     process_uploaded_pdf, start_background_analysis,
     get_analysis_status, clear_analysis_status, has_running_tasks,
-    toggle_bookmark, get_distinct_sources,
+    toggle_bookmark, get_distinct_sources, load_all_papers,
+    delete_paper, delete_papers,
 )
 from src.dashboard.config import init_config_form
 from src.dashboard.components import (
@@ -57,6 +58,72 @@ with st.sidebar:
     show_bookmarked_only = st.checkbox("⭐ Show only bookmarks", value=False)
     sort_by = st.selectbox("Sort By", ["Sort by date", "Sort by score"], index=0)
     sort_key = "score" if sort_by == "Sort by score" else "date"
+
+    min_score = st.slider(
+        "Minimum Relevance Score",
+        min_value=0,
+        max_value=10,
+        value=0,
+        step=1,
+        help="Only show papers with a relevance score ≥ this value (0 = no filter)",
+    )
+
+    st.divider()
+
+    # --- Delete papers ---
+    st.markdown("### Delete Papers")
+    all_papers_for_delete = load_all_papers()
+
+    if not all_papers_for_delete:
+        st.caption("No papers available for deletion.")
+    else:
+        option_map = {}
+        for p in all_papers_for_delete:
+            short_title = p.title if len(p.title) <= 50 else p.title[:47] + "..."
+            label = f"{short_title} [{source_label(p.source)}] ({p.id})"
+            option_map[label] = p.id
+
+        delete_mode = st.radio(
+            "Delete mode",
+            ["Single", "Batch"],
+            horizontal=True,
+            key="delete_mode",
+        )
+
+        if delete_mode == "Single":
+            selected_label = st.selectbox(
+                "Select one paper",
+                options=list(option_map.keys()),
+                key="delete_single_select",
+            )
+            if st.button("Delete Selected", type="secondary", use_container_width=True, key="delete_single_btn"):
+                target_id = option_map[selected_label]
+                if delete_paper(target_id):
+                    if st.session_state.selected_paper_id == target_id:
+                        st.session_state.selected_paper_id = None
+                    st.toast("Paper deleted")
+                    st.rerun()
+                else:
+                    st.error("Delete failed: paper not found")
+        else:
+            selected_labels = st.multiselect(
+                "Select papers",
+                options=list(option_map.keys()),
+                key="delete_batch_select",
+            )
+            if st.button(
+                "Delete Selected Batch",
+                type="secondary",
+                use_container_width=True,
+                disabled=not selected_labels,
+                key="delete_batch_btn",
+            ):
+                target_ids = [option_map[label] for label in selected_labels]
+                deleted_count = delete_papers(target_ids)
+                if st.session_state.selected_paper_id in target_ids:
+                    st.session_state.selected_paper_id = None
+                st.toast(f"Deleted {deleted_count} papers")
+                st.rerun()
 
     st.divider()
 
@@ -126,6 +193,7 @@ papers = load_papers(
     filter_sources=filter_source,
     sort_by=sort_key,
     show_bookmarked_only=show_bookmarked_only,
+    min_score=min_score,
 )
 
 if search_query:
@@ -186,6 +254,14 @@ else:
             if st.button(bm_label, key="toggle_bm", type=bm_type, use_container_width=True):
                 toggle_bookmark(current_paper.id)
                 st.rerun()
+
+            if st.button("Delete This Paper", key="delete_current_paper", type="secondary", use_container_width=True):
+                if delete_paper(current_paper.id):
+                    st.session_state.selected_paper_id = None
+                    st.toast("Paper deleted")
+                    st.rerun()
+                else:
+                    st.error("Delete failed: paper not found")
 
         with st.container(height=650):
             authors_str = ", ".join(current_paper.authors) if current_paper.authors else "Unknown"

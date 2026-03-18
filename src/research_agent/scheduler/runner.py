@@ -108,16 +108,17 @@ def _run_ingestion(config: dict) -> tuple[int, int]:
             paper.relevance_reason = result["reason"]
             paper.relevance_score = result.get("relevance_score", 0)
 
+            if not paper.is_relevant:
+                logger.info(f"  Not relevant (skip storing): {paper.title[:60]}")
+                continue
+
             session.add(paper)
             session.commit()
 
-            if paper.is_relevant:
-                papers_relevant += 1
-                logger.info(
-                    f"  Relevant (score={paper.relevance_score}): {paper.title[:60]}"
-                )
-            else:
-                logger.info(f"  Not relevant: {paper.title[:60]}")
+            papers_relevant += 1
+            logger.info(
+                f"  Relevant (score={paper.relevance_score}): {paper.title[:60]}"
+            )
 
     return papers_found, papers_relevant
 

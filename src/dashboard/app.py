@@ -10,6 +10,16 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 import streamlit as st
+from loguru import logger
+import sys
+
+# ============================
+# Configure loguru to output to current stderr (Streamlit-safe)
+# ============================
+logger.remove()  # 移除默认 sink（可能指向旧的 stderr）
+logger.add(sys.stderr, level="DEBUG", colorize=True,
+           format="<green>{time:HH:mm:ss}</green> | <level>{level:<8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan> - <level>{message}</level>")
+
 from src.dashboard.styles import inject_css
 from src.dashboard.components import render_top_navbar
 

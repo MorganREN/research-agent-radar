@@ -52,15 +52,19 @@ def process_uploaded_pdf(file_path: str) -> dict:
     """Only parse PDF metadata and store in database (no deep analysis)."""
     parser = PDFUploadParser()
     try:
-        paper = parser.parse_info(file_path)
-        if not paper:
-            logger.error("PDF parsing failed, unable to extract paper information.")
-            return {"error": "PDF parsing failed, unable to extract paper information."}
-        logger.info(f"Paper metadata extraction complete: {paper.title}")
-        return {"message": "PDF metadata parsing complete", "paper_id": paper.id}
+        result = parser.parse_info(file_path)
+        # 防御性检查：确保返回的是 Paper 对象而非其他类型
+        if result is None:
+            logger.error(f"PDF parsing returned None for: {file_path}")
+            return {"error": "PDF 解析失败：无法提取论文信息。请确认文件是有效的学术论文 PDF（非扫描版）。"}
+        if not isinstance(result, Paper):
+            logger.error(f"parse_info returned unexpected type {type(result)}: {result}")
+            return {"error": "PDF 解析返回了异常结果，请重试。"}
+        logger.info(f"Paper metadata extraction complete: {result.title}")
+        return {"message": "PDF metadata parsing complete", "paper_id": result.id}
     except Exception as e:
-        logger.error(f"Error processing uploaded PDF: {e}")
-        return {"error": f"Error processing uploaded PDF: {e}"}
+        logger.error(f"Error processing uploaded PDF: {e}", exc_info=True)
+        return {"error": f"处理 PDF 时出错: {e}"}
 
 
 def _run_analysis_background(paper_id: str, file_path: str):
@@ -139,6 +143,47 @@ def toggle_bookmark(paper_id: str) -> bool:
         return paper.is_bookmarked
 
 
+def delete_paper(paper_id: str) -> bool:
+    """Delete one paper by id. Returns True if deleted."""
+    with Session(engine) as session:
+        paper = session.get(Paper, paper_id)
+        if not paper:
+            return False
+        session.delete(paper)
+        session.commit()
+
+    with _tasks_lock:
+        _analysis_tasks.pop(paper_id, None)
+
+    logger.info(f"Deleted paper: {paper_id}")
+    return True
+
+
+def delete_papers(paper_ids: list[str]) -> int:
+    """Delete multiple papers by ids. Returns deleted count."""
+    if not paper_ids:
+        return 0
+
+    unique_ids = list(dict.fromkeys(paper_ids))
+    deleted_count = 0
+
+    with Session(engine) as session:
+        for paper_id in unique_ids:
+            paper = session.get(Paper, paper_id)
+            if not paper:
+                continue
+            session.delete(paper)
+            deleted_count += 1
+        session.commit()
+
+    with _tasks_lock:
+        for paper_id in unique_ids:
+            _analysis_tasks.pop(paper_id, None)
+
+    logger.info(f"Bulk deleted papers: {deleted_count}/{len(unique_ids)}")
+    return deleted_count
+
+
 def initialize_database() -> bool:
     """Create all database tables and ensure new columns exist."""
     try:
@@ -168,6 +213,7 @@ def load_papers(
     filter_sources: list = None,
     sort_by: str = "date",
     show_bookmarked_only: bool = False,
+    min_score: int = 0,
 ):
     """Load papers from database with filtering and sorting."""
     try:
@@ -182,6 +228,11 @@ def load_papers(
 
             if show_bookmarked_only:
                 statement = statement.where(Paper.is_bookmarked == True)
+
+            if min_score > 0:
+                statement = statement.where(
+                    col(Paper.relevance_score) >= min_score
+                )
 
             # Sorting
             if sort_by == "score":

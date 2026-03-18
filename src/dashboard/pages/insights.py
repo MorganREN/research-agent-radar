@@ -3,6 +3,9 @@
 import sys
 import os
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+BRISBANE_TZ = ZoneInfo("Australia/Brisbane")
 from collections import defaultdict, Counter
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
@@ -287,7 +290,7 @@ sorted_days = sorted(grouped.keys(), reverse=True)
 # 汇总统计
 # ============================
 total = len(papers)
-today_key = datetime.now(timezone.utc).replace(tzinfo=None).strftime("%Y-%m-%d")
+today_key = datetime.now(BRISBANE_TZ).strftime("%Y-%m-%d")
 today_count = len(grouped.get(today_key, []))
 
 st.markdown(

@@ -14,6 +14,7 @@ import argparse
 import signal
 import threading
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 # Ensure project root is on sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -24,12 +25,14 @@ from src.research_agent.storage.models import create_db_and_tables
 from src.research_agent.scheduler.runner import run_pipeline_from_config, _load_user_config
 from src.research_agent.scheduler.status import update_scheduler_state
 
+BRISBANE_TZ = ZoneInfo("Australia/Brisbane")
 
-def _next_scheduled_time(hour: int = 8, minute: int = 0) -> datetime:
-    """Return the next occurrence of HH:MM in local time (naive datetime)."""
-    now = datetime.now()
-    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if now >= target:
+
+def _next_scheduled_time(hour: int = 5, minute: int = 0) -> datetime:
+    """Return the next occurrence of HH:MM Brisbane time (AEST, UTC+10) as a timezone-aware datetime."""
+    now_brisbane = datetime.now(BRISBANE_TZ)
+    target = now_brisbane.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if now_brisbane >= target:
         target += timedelta(days=1)
     return target
 
@@ -61,7 +64,7 @@ def main():
     config = _load_user_config()
     scheduled_time_str = config.get("scheduled_time", "08:00")
     hour, minute = (int(x) for x in scheduled_time_str.split(":"))
-    frequency_str = f"Daily at {scheduled_time_str}"
+    frequency_str = f"Daily at {scheduled_time_str} AEST (Brisbane)"
 
     stop_event = threading.Event()
 
@@ -93,17 +96,17 @@ def main():
             except Exception as e:
                 logger.error(f"Pipeline run failed: {e}")
 
-            next_local = _next_scheduled_time(hour, minute)
-            wait_seconds = (next_local - datetime.now()).total_seconds()
+            next_brisbane = _next_scheduled_time(hour, minute)
+            wait_seconds = (next_brisbane - datetime.now(BRISBANE_TZ)).total_seconds()
             # Store next_run as naive UTC for dashboard display
-            next_run_utc = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(seconds=wait_seconds)
+            next_run_utc = next_brisbane.astimezone(timezone.utc).replace(tzinfo=None)
             update_scheduler_state(
                 is_running=True,
                 pid=os.getpid(),
                 next_run_at=next_run_utc,
                 frequency=frequency_str,
             )
-            logger.info(f"Next run scheduled at {next_local.strftime('%Y-%m-%d %H:%M')} (local)")
+            logger.info(f"Next run scheduled at {next_brisbane.strftime('%Y-%m-%d %H:%M')} AEST (Brisbane)")
 
             # Wait until the scheduled time or until stop signal
             stop_event.wait(timeout=wait_seconds)

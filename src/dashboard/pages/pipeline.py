@@ -13,6 +13,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.
 
 import streamlit as st
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+BRISBANE_TZ = ZoneInfo("Australia/Brisbane")
 
 from src.research_agent.storage.models import create_db_and_tables
 from src.research_agent.scheduler.status import (
@@ -86,7 +89,8 @@ if state and alive:
         st.metric("Frequency", state.update_frequency)
     with col2:
         if state.next_run_at:
-            st.metric("Next Run", state.next_run_at.strftime("%Y-%m-%d %H:%M UTC"))
+            next_brisbane = state.next_run_at.replace(tzinfo=timezone.utc).astimezone(BRISBANE_TZ)
+            st.metric("Next Run", next_brisbane.strftime("%Y-%m-%d %H:%M AEST"))
         else:
             st.metric("Next Run", "Running now...")
     with col3:

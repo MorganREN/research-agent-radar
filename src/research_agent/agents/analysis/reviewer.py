@@ -24,6 +24,7 @@ KIMI_EXTRA_BODY = build_kimi_extra_body(CONFIG_MODEL, KIMI_BASE_URL)
 # 直接分析上限：~200K 字符 ≈ ~50-60K tokens（为 prompt + 回复预留空间）
 # Kimi K2.5 的 128K 窗口足以覆盖几乎所有学术论文
 MAX_CHARS_DIRECT = 200_000
+ANALYSIS_MIN_SCORE = 6
 
 # 仅在极端超长文档时启用 Map-Reduce fallback
 CHUNK_SIZE = 50_000  # 每块 ~12K tokens，减少分块次数
@@ -272,6 +273,7 @@ if __name__ == "__main__":
         statement = (
             select(Paper)
             .where(Paper.is_relevant == True)
+            .where(Paper.relevance_score >= ANALYSIS_MIN_SCORE)
             .where(Paper.download_status == "downloaded")
             .where(Paper.source == "arxiv")
         )

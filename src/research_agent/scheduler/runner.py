@@ -20,7 +20,7 @@ from src.research_agent.agents.scout.arxiv_scout import ArxivScout
 from src.research_agent.agents.scout.elsevier_scout import ElsevierScout
 from src.research_agent.agents.filter.triage_agent import RelevanceFilter
 from src.research_agent.acquisition.downloader import DownloadManager
-from src.research_agent.agents.analysis.reviewer import PaperReviewer
+from src.research_agent.agents.analysis.reviewer import PaperReviewer, ANALYSIS_MIN_SCORE
 from src.research_agent.scheduler.status import create_run, complete_run, fail_run
 
 
@@ -124,14 +124,17 @@ def _run_ingestion(config: dict) -> tuple[int, int]:
 
 
 async def _run_analysis_async() -> int:
-    """Download + analyze relevant papers. Returns count of newly analyzed."""
+    """Download + analyze papers with relevance score >= threshold. Returns count of newly analyzed."""
     reviewer = PaperReviewer()
     downloader = DownloadManager()
     analyzed = 0
 
     with Session(engine) as session:
         papers = session.exec(
-            select(Paper).where(Paper.is_relevant == True)
+            select(Paper).where(
+                Paper.is_relevant == True,
+                Paper.relevance_score >= ANALYSIS_MIN_SCORE,
+            )
         ).all()
 
         for paper in papers:

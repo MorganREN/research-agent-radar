@@ -4,7 +4,7 @@ from src.research_agent.agents.scout.arxiv_scout import ArxivScout
 from src.research_agent.agents.scout.elsevier_scout import ElsevierScout
 from src.research_agent.agents.filter.triage_agent import RelevanceFilter
 from src.research_agent.acquisition.downloader import DownloadManager
-from src.research_agent.agents.analysis.reviewer import PaperReviewer
+from src.research_agent.agents.analysis.reviewer import PaperReviewer, ANALYSIS_MIN_SCORE
 from loguru import logger
 import asyncio
 
@@ -76,10 +76,11 @@ async def run_analysis_phase():
     downloader = DownloadManager()
 
     with Session(engine) as session:
-        # 1. 获取所有已下载且相关的论文
+        # 1. 获取所有已相关且评分 >= ANALYSIS_MIN_SCORE 的论文
         papers = session.exec(
             select(Paper).where(
                 Paper.is_relevant == True,
+                Paper.relevance_score >= ANALYSIS_MIN_SCORE,
             )
         ).all()
 

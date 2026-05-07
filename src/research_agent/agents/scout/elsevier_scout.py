@@ -66,7 +66,7 @@ class ElsevierScout:
         self.max_results = max_results
         self.year = year
         self.search_base_url = "https://api.elsevier.com/content/search/sciencedirect"
-        self.api_key = os.getenv("ELSEVIER_API_KEY")
+        self.api_key = os.getenv("ELSEVIER_API_KEY_BACKUP")
         self.headers = {
             "X-ELS-APIKey": self.api_key,
             "Accept": "application/json"
@@ -186,8 +186,10 @@ class ElsevierScout:
                         logger.info("✅ Loaded journal list from user_config.yaml")
                     else:
                         logger.warning("⚠️ No 'journals' key found in user_config.yaml, using default journals")
+                        self.journals = DEFAULT_Journals
             else:
                 logger.warning(f"⚠️ Config file not found at {config_path}, using default journals")
+                self.journals = DEFAULT_Journals
         except Exception as e:
             logger.warning(f"⚠️ Error loading config: {e}, using default journals")
             self.journals = DEFAULT_Journals

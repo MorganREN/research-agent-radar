@@ -18,7 +18,7 @@ from sqlmodel import Session, select
 from src.research_agent.storage.models import Paper, create_db_and_tables, engine
 from src.research_agent.agents.scout.arxiv_scout import ArxivScout
 from src.research_agent.agents.scout.elsevier_scout import ElsevierScout
-from src.research_agent.agents.filter.triage_agent import RelevanceFilter
+from src.research_agent.agents.filter.triage_agent import RelevanceFilter, MIN_STORE_SCORE
 from src.research_agent.acquisition.downloader import DownloadManager
 from src.research_agent.agents.analysis.reviewer import PaperReviewer, ANALYSIS_MIN_SCORE
 from src.research_agent.scheduler.status import create_run, complete_run, fail_run
@@ -110,6 +110,12 @@ def _run_ingestion(config: dict) -> tuple[int, int]:
 
             if not paper.is_relevant:
                 logger.info(f"  Not relevant (skip storing): {paper.title[:60]}")
+                continue
+
+            if paper.relevance_score < MIN_STORE_SCORE:
+                logger.info(
+                    f"  Score {paper.relevance_score} < {MIN_STORE_SCORE} (skip storing): {paper.title[:60]}"
+                )
                 continue
 
             session.add(paper)

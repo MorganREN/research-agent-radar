@@ -2,7 +2,7 @@ from sqlmodel import Session, select
 from src.research_agent.storage.models import Paper, create_db_and_tables, engine
 from src.research_agent.agents.scout.arxiv_scout import ArxivScout
 from src.research_agent.agents.scout.elsevier_scout import ElsevierScout
-from src.research_agent.agents.filter.triage_agent import RelevanceFilter
+from src.research_agent.agents.filter.triage_agent import RelevanceFilter, MIN_STORE_SCORE
 from src.research_agent.acquisition.downloader import DownloadManager
 from src.research_agent.agents.analysis.reviewer import PaperReviewer, ANALYSIS_MIN_SCORE
 from loguru import logger
@@ -58,6 +58,13 @@ def run_ingestion_pipeline():
             paper.is_relevant = result['is_relevant']
             paper.relevance_reason = result['reason']
             paper.relevance_score = result.get('relevance_score', 0)
+
+            if (not paper.is_relevant) or (paper.relevance_score < MIN_STORE_SCORE):
+                logger.info(
+                    f"⏭️  跳过低相关论文: {paper.id} "
+                    f"(is_relevant={paper.is_relevant}, score={paper.relevance_score})"
+                )
+                continue
 
             # 5.4 存入数据库
             session.add(paper)

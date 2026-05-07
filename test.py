@@ -7,6 +7,11 @@ import os
 import time
 from dotenv import load_dotenv
 from openai import OpenAI
+from src.research_agent.llm.kimi import (
+    build_kimi_extra_body,
+    extract_message_content,
+    extract_message_reasoning,
+)
 
 load_dotenv()
 
@@ -21,15 +26,19 @@ MODELS_TO_TEST = [
 
     # ── 如需测试其他供应商，取消注释并填入对应环境变量 ──
     # ("Claude-sonnet", "claude-sonnet-4-20250514", "ANTHROPIC_API_KEY", "https://api.anthropic.com/v1/"),
-    ("DeepSeek-V3",   "deepseek-chat",           "DEEPSEEK_API_KEY",  "https://api.deepseek.com"),
-    ("Qwen-Plus",     "qwen-plus",               "QWEN_API_KEY",      "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-    ("kimi-k2.5",       "kimi-k2.5",               "KIMI_API_KEY",      "https://api.moonshot.cn/v1"),
+    ("DeepSeek-V3.2",   "DeepSeek-V3.2",           "DEEPSEEK_API_KEY",  "https://api.deepseek.com"),
+    # ("Qwen-Plus",     "qwen-plus",               "QWEN_API_KEY",      "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+    # ("kimi-k2.5",       "kimi-k2.5",               "BOB_API_KEY",      "https://bobdong.cn/v1"),
+    ("GLM-5.1",         "GLM-5.1",                 "BOB_API_KEY",        "https://bobdong.cn/v1"),
+    ("Qwen3.5-Plus",     "Qwen3.5-Plus",             "BOB_API_KEY",       "https://bobdong.cn/v1"),
     # ("Gemini-2.5-Flash", "gemini-2.5-flash",     "GEMINI_API_KEY",    "https://generativelanguage.googleapis.com/v1beta/openai/"),
 ]
 
-TEST_PROMPT = "Write a haiku about the beauty of nature in spring. 以中文写一个关于春天自然美的俳句。"
-
-
+TEST_PROMPT = (
+    "Write a haiku about the beauty of nature in spring. "
+    "以中文写一个关于春天自然美的俳句。"
+    "只输出最终答案，不要输出推理过程。"
+)
 def test_model(name: str, model: str, api_key_env: str, base_url: str | None) -> dict:
     """测试单个模型，返回结果字典"""
     api_key = os.getenv(api_key_env)
@@ -44,14 +53,32 @@ def test_model(name: str, model: str, api_key_env: str, base_url: str | None) ->
 
     t0 = time.time()
     try:
+        request_kwargs = {
+            "model": model,
+            "messages": [{"role": "user", "content": TEST_PROMPT}],
+            "max_tokens": 2048,
+            "timeout": 30,
+        }
+        extra_body = build_kimi_extra_body(model, base_url)
+        if extra_body:
+            request_kwargs["extra_body"] = extra_body
+
         resp = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": TEST_PROMPT}],
-            max_tokens= 64,
-            timeout=30,
+            **request_kwargs,
         )
         latency = time.time() - t0
-        content = resp.choices[0].message.content.strip()
+        message = resp.choices[0].message
+        content = extract_message_content(message)
+        if not content:
+            finish_reason = getattr(resp.choices[0], "finish_reason", "unknown")
+            reasoning = extract_message_reasoning(message)
+            if reasoning:
+                content = (
+                    f"[no final content] finish_reason={finish_reason}; "
+                    f"reasoning_len={len(reasoning)}"
+                )
+            else:
+                content = f"[empty response] finish_reason={finish_reason}"
         return {"name": name, "status": "PASS", "detail": content, "latency": latency}
     except Exception as e:
         latency = time.time() - t0

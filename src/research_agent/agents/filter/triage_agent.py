@@ -6,10 +6,13 @@ from dotenv import load_dotenv
 from loguru import logger
 import yaml
 from pathlib import Path
+from src.research_agent.llm.kimi import KIMI_BASE_URL, build_kimi_extra_body
 
 load_dotenv()
-CONFIG_MODEL = "qwen3.5-flash"
-QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+QWEN_BASE_URL = "https://bobdong.cn/v1"
+KIMI_MODEL = "kimi-k2.5"
+QWEN_MODEL = "Qwen3.5-Plus"
+MIN_STORE_SCORE = 4
 
 DEFAULT_INSTRUCTION = """
 你是一个严谨的学术助手。请根据用户的【研究领域画像】，判断给定的论文是否值得深入阅读。
@@ -30,10 +33,15 @@ DEFAULT_PROFILE = """
 
 class RelevanceFilter:
     def __init__(self, research_interests: str):
-        self.client = OpenAI(
-            api_key=os.getenv("QWEN_API_KEY"),
+        self.kimi_client = OpenAI(
+            api_key=os.getenv("KIMI_API_KEY"),
+            base_url=KIMI_BASE_URL,
+        )
+        self.qwen_client = OpenAI(
+            api_key=os.getenv("BOB_API_KEY"),
             base_url=QWEN_BASE_URL,
         )
+        self.kimi_extra_body = build_kimi_extra_body(KIMI_MODEL, KIMI_BASE_URL)
         self.interest_items = self._load_research_interests(research_interests)
         self.interests = self._format_interests(self.interest_items)
 
@@ -102,6 +110,33 @@ class RelevanceFilter:
         score = round((matched_count / safe_total) * 10)
         return max(1, min(10, score))
 
+    def _call_model(self, client: OpenAI, model: str, prompt: str, extra_body=None):
+        kwargs = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+        }
+        if extra_body:
+            kwargs["extra_body"] = extra_body
+        return client.chat.completions.create(**kwargs)
+
+    def _call_relevance_llm(self, prompt: str):
+        attempts = [
+            ("Kimi", self.kimi_client, KIMI_MODEL, self.kimi_extra_body),
+            ("Qwen", self.qwen_client, QWEN_MODEL, None),
+        ]
+
+        errors = []
+        for provider_name, client, model, extra_body in attempts:
+            try:
+                logger.info(f"🧠 RelevanceFilter using {provider_name} model: {model}")
+                return self._call_model(client, model, prompt, extra_body=extra_body)
+            except Exception as e:
+                errors.append(f"{provider_name}: {e}")
+                logger.warning(f"⚠️ {provider_name} relevance check failed: {e}")
+
+        raise RuntimeError("; ".join(errors)) if errors else RuntimeError("No LLM provider available")
+
 
     def check_relevance(self, title: str, abstract: str) -> dict:
         """
@@ -130,11 +165,7 @@ class RelevanceFilter:
         """
 
         try:
-            response = self.client.chat.completions.create(
-                model=CONFIG_MODEL, # 使用轻量级模型以降低成本
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"}
-            )
+            response = self._call_relevance_llm(prompt)
             result = json.loads(response.choices[0].message.content)
 
             matched_indices = self._sanitize_interest_indices(result.get("matched_interest_indices", []))
@@ -144,8 +175,8 @@ class RelevanceFilter:
                 matched_indices = [1] if self.interest_items else []
 
             matched_count = len(matched_indices)
-            is_relevant = matched_count > 0
             score = self._compute_relevance_score(matched_count, len(self.interest_items))
+            is_relevant = matched_count > 0 and score >= MIN_STORE_SCORE
 
             reason = str(result.get("reason", "")).strip()
             if not reason:
@@ -153,6 +184,8 @@ class RelevanceFilter:
                     reason = f"匹配到 {matched_count} 个兴趣点"
                 else:
                     reason = "与兴趣点无明确匹配"
+            if matched_count > 0 and score < MIN_STORE_SCORE:
+                reason = f"评分 {score} 低于入库阈值 {MIN_STORE_SCORE}，不进入数据库"
 
             matched_interests = [self.interest_items[i - 1] for i in matched_indices]
 

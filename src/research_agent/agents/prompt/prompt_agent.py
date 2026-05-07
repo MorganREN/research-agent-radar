@@ -4,13 +4,13 @@ from loguru import logger
 import os
 
 load_dotenv()
-CONFIG_MODEL = "qwen3.5-flash"
-QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+CONFIG_MODEL = "Qwen3.5-Plus"
+QWEN_BASE_URL = "https://bobdong.cn/v1"
 
 class PromptAgent:
     def __init__(self):
         self.client = OpenAI(
-            api_key=os.getenv("QWEN_API_KEY"),
+            api_key=os.getenv("BOB_API_KEY"),
             base_url=QWEN_BASE_URL,
         )
 

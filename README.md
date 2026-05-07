@@ -171,6 +171,100 @@ poetry run radar --once
 
 ---
 
+## ♾️ Persistent Run (macOS)
+
+For long-running usage (close terminal without stopping services), you can run three background processes:
+
+1. **Streamlit dashboard** (persistent)
+2. **ngrok tunnel** (expose Streamlit localhost to internet)
+3. **Radar scheduler daemon** (persistent)
+
+### 1) Start Streamlit persistently
+
+```bash
+cd /Users/renmohan/code/research-agent-radar
+mkdir -p logs pids
+
+nohup poetry run streamlit run src/dashboard/app.py --server.port 8501 --server.address 0.0.0.0 \
+  >> logs/streamlit.log 2>&1 &
+echo $! > pids/streamlit.pid
+```
+
+Check / stop:
+
+```bash
+ps -p "$(cat pids/streamlit.pid)" -o pid,etime,command
+tail -f logs/streamlit.log
+kill "$(cat pids/streamlit.pid)"
+```
+
+### 2) Expose Streamlit via ngrok
+
+Install + auth (first time only):
+
+```bash
+brew install ngrok/ngrok/ngrok
+ngrok config add-authtoken <YOUR_NGROK_AUTHTOKEN>
+```
+
+Run ngrok persistently (map local `8501`):
+
+```bash
+cd /Users/renmohan/code/research-agent-radar
+nohup ngrok http 8501 >> logs/ngrok.log 2>&1 &
+echo $! > pids/ngrok.pid
+```
+
+Get public URL:
+
+```bash
+curl -s http://127.0.0.1:4040/api/tunnels | python -c "import sys,json;d=json.load(sys.stdin);print(d['tunnels'][0]['public_url'] if d.get('tunnels') else 'No tunnel')"
+```
+
+Check / stop:
+
+```bash
+ps -p "$(cat pids/ngrok.pid)" -o pid,etime,command
+tail -f logs/ngrok.log
+kill "$(cat pids/ngrok.pid)"
+```
+
+### 3) Start scheduler daemon persistently
+
+```bash
+cd /Users/renmohan/code/research-agent-radar
+nohup poetry run radar >> logs/radar.log 2>&1 &
+echo $! > pids/radar.pid
+```
+
+Check / stop:
+
+```bash
+ps -p "$(cat pids/radar.pid)" -o pid,etime,command
+tail -f logs/radar.log
+kill "$(cat pids/radar.pid)"
+```
+
+### Optional: restart all three quickly
+
+```bash
+cd /Users/renmohan/code/research-agent-radar
+
+# stop old processes if pid files exist
+for svc in streamlit ngrok radar; do
+  [ -f "pids/${svc}.pid" ] && kill "$(cat pids/${svc}.pid)" 2>/dev/null || true
+done
+
+# start services
+nohup poetry run streamlit run src/dashboard/app.py --server.port 8501 --server.address 0.0.0.0 >> logs/streamlit.log 2>&1 & echo $! > pids/streamlit.pid
+nohup ngrok http 8501 >> logs/ngrok.log 2>&1 & echo $! > pids/ngrok.pid
+nohup poetry run radar >> logs/radar.log 2>&1 & echo $! > pids/radar.pid
+```
+
+> ⚠️ Keep your API keys in `.env` and do not expose secrets through Streamlit pages.
+
+---
+
 ## 📂 Project Structure
 
 ```

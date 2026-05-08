@@ -26,6 +26,10 @@ def _ensure_columns():
     migrations = [
         ("relevance_score", "INTEGER"),
         ("is_bookmarked", "BOOLEAN DEFAULT 0"),
+        ("triage_status", "VARCHAR DEFAULT 'pending'"),
+        ("triage_error", "VARCHAR"),
+        ("analysis_status", "VARCHAR DEFAULT 'pending'"),
+        ("analysis_error", "VARCHAR"),
     ]
     # scheduler run table migration
     scheduler_migrations = [
@@ -80,6 +84,8 @@ def _run_analysis_background(paper_id: str, file_path: str):
                 return
             report = reviewer.analyze_paper(paper, pdf_path=file_path)
             paper.analysis_report = report
+            paper.analysis_status = "completed"
+            paper.analysis_error = None
             session.add(paper)
             session.commit()
             logger.info(f"Background analysis complete: {paper.title}")
@@ -87,6 +93,13 @@ def _run_analysis_background(paper_id: str, file_path: str):
             _analysis_tasks[paper_id] = "done"
     except Exception as e:
         logger.error(f"Background analysis error ({paper_id}): {e}")
+        with Session(engine) as session:
+            paper = session.get(Paper, paper_id)
+            if paper:
+                paper.analysis_status = "failed"
+                paper.analysis_error = str(e)
+                session.add(paper)
+                session.commit()
         with _tasks_lock:
             _analysis_tasks[paper_id] = "error"
 

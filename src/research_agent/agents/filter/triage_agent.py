@@ -4,8 +4,7 @@ from openai import OpenAI
 import os
 from dotenv import load_dotenv
 from loguru import logger
-import yaml
-from pathlib import Path
+from src.research_agent.llm.clients import get_env_any
 from src.research_agent.llm.kimi import KIMI_BASE_URL, build_kimi_extra_body
 
 load_dotenv()
@@ -32,17 +31,17 @@ DEFAULT_PROFILE = """
 """
 
 class RelevanceFilter:
-    def __init__(self, research_interests: str):
+    def __init__(self, research_interests: str | list[str]):
         self.kimi_client = OpenAI(
             api_key=os.getenv("KIMI_API_KEY"),
             base_url=KIMI_BASE_URL,
         )
         self.qwen_client = OpenAI(
-            api_key=os.getenv("BOB_API_KEY"),
+            api_key=get_env_any("BOB_API_KEY", "QWEN_API_KEY"),
             base_url=QWEN_BASE_URL,
         )
         self.kimi_extra_body = build_kimi_extra_body(KIMI_MODEL, KIMI_BASE_URL)
-        self.interest_items = self._load_research_interests(research_interests)
+        self.interest_items = self._normalize_research_interests(research_interests)
         self.interests = self._format_interests(self.interest_items)
 
     @staticmethod
@@ -62,29 +61,17 @@ class RelevanceFilter:
                 items.append(text)
         return items
 
-    def _load_research_interests(self, fallback_interests: str) -> list[str]:
-        """Load research interests from user_config.yaml"""
-        config_path = Path(__file__).parent.parent.parent / "config" / "user_config.yaml"
-        
-        try:
-            if config_path.exists():
-                with open(config_path, "r", encoding="utf-8") as f:
-                    config = yaml.safe_load(f)
-                    if config and "fields" in config:
-                        fields = config.get("fields", [])
-                        if fields:
-                            logger.info(f"✅ Loaded research interests from config:\n{self._format_interests(fields)}")
-                            return fields
-                logger.warning("⚠️ No 'fields' found in user_config.yaml, using DEFAULT_PROFILE")
-            else:
-                logger.warning(f"⚠️ Config file not found at {config_path}, using DEFAULT_PROFILE")
-        except Exception as e:
-            logger.warning(f"⚠️ Error loading config: {e}, using DEFAULT_PROFILE")
+    def _normalize_research_interests(self, research_interests: str | list[str]) -> list[str]:
+        """Normalize caller-provided interests without reading global config."""
+        if isinstance(research_interests, list):
+            items = [str(item).strip() for item in research_interests if str(item).strip()]
+        else:
+            items = self._parse_interests_from_text(research_interests or "")
 
-        parsed_fallback = self._parse_interests_from_text(fallback_interests or "")
-        if parsed_fallback:
-            return parsed_fallback
-        
+        if items:
+            return items
+
+        logger.warning("⚠️ No research interests provided, using DEFAULT_PROFILE")
         return self._parse_interests_from_text(DEFAULT_PROFILE)
 
     def _sanitize_interest_indices(self, raw_indices) -> list[int]:
@@ -198,5 +185,10 @@ class RelevanceFilter:
                 "matched_interests": matched_interests,
             }
         except Exception as e:
-            print(f"⚠️ 筛选出错: {e}")
-            return {"is_relevant": False, "reason": "Error during LLM check", "relevance_score": 0}
+            logger.error(f"⚠️ 筛选出错: {e}")
+            return {
+                "is_relevant": None,
+                "reason": "Error during LLM check",
+                "relevance_score": 0,
+                "error": str(e),
+            }

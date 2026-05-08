@@ -1,7 +1,7 @@
 from openai import OpenAI
 from dotenv import load_dotenv
 from loguru import logger
-import os
+from src.research_agent.llm.clients import get_env_any
 
 load_dotenv()
 CONFIG_MODEL = "Qwen3.5-Plus"
@@ -10,7 +10,7 @@ QWEN_BASE_URL = "https://bobdong.cn/v1"
 class PromptAgent:
     def __init__(self):
         self.client = OpenAI(
-            api_key=os.getenv("BOB_API_KEY"),
+            api_key=get_env_any("BOB_API_KEY", "QWEN_API_KEY"),
             base_url=QWEN_BASE_URL,
         )
 

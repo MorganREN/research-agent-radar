@@ -10,9 +10,8 @@ from src.research_agent.llm.kimi import (
     extract_response_content,
 )
 from dotenv import load_dotenv
-import yaml
-from pathlib import Path
 from typing import List
+from src.research_agent.config.loader import load_analysis_prompt
 
 load_dotenv()
 
@@ -93,16 +92,11 @@ class PaperReviewer:
 
     def _load_reviewer_prompt(self) -> str:
         """Load reviewer prompt from analysis_prompt.yaml, fallback to DEFAULT_PROMPT."""
-        config_path = Path(__file__).parent.parent.parent / "config" / "analysis_prompt.yaml"
         try:
-            if config_path.exists():
-                with open(config_path, "r", encoding="utf-8") as f:
-                    config = yaml.safe_load(f)
-                    if config and "template" in config:
-                        return config["template"]
-                logger.warning("⚠️ No 'template' found in analysis_prompt.yaml, using DEFAULT_PROMPT")
-            else:
-                logger.warning(f"⚠️ Config file not found at {config_path}, using DEFAULT_PROMPT")
+            config = load_analysis_prompt()
+            if config and "template" in config:
+                return config["template"]
+            logger.warning("⚠️ No 'template' found in analysis_prompt.yaml, using DEFAULT_PROMPT")
         except Exception as e:
             logger.warning(f"⚠️ Error loading config: {e}, using DEFAULT_PROMPT")
         return DEFAULT_PROMPT

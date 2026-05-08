@@ -9,31 +9,20 @@ Reads all parameters from user_config.yaml and executes:
 """
 import asyncio
 from datetime import datetime
-from pathlib import Path
 
-import yaml
 from loguru import logger
 from sqlmodel import Session, select
 
+from src.research_agent.config.loader import load_user_config
 from src.research_agent.storage.models import Paper, create_db_and_tables, engine
 from src.research_agent.agents.scout.arxiv_scout import ArxivScout
 from src.research_agent.agents.scout.elsevier_scout import ElsevierScout
 from src.research_agent.agents.filter.triage_agent import RelevanceFilter, MIN_STORE_SCORE
-from src.research_agent.acquisition.downloader import DownloadManager
-from src.research_agent.agents.analysis.reviewer import PaperReviewer, ANALYSIS_MIN_SCORE
 from src.research_agent.scheduler.status import create_run, complete_run, fail_run
 
-
-CONFIG_PATH = Path(__file__).parent.parent / "config" / "user_config.yaml"
-
-
 def _load_user_config() -> dict:
-    """Load user_config.yaml."""
-    if not CONFIG_PATH.exists():
-        logger.warning(f"Config not found at {CONFIG_PATH}, using empty config")
-        return {}
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+    """Backward-compatible wrapper used by src.run."""
+    return load_user_config()
 
 
 def _build_arxiv_query(fields: list[str]) -> str:
@@ -61,6 +50,7 @@ def _build_scouts(config: dict) -> list:
 
     if "sciencedirect" in sources:
         scouts.append(ElsevierScout(
+            journals=config.get("journals", []),
             max_results=30,
             year=datetime.now().year,
         ))
@@ -107,6 +97,14 @@ def _run_ingestion(config: dict) -> tuple[int, int]:
             paper.is_relevant = result["is_relevant"]
             paper.relevance_reason = result["reason"]
             paper.relevance_score = result.get("relevance_score", 0)
+            paper.triage_status = "failed" if result.get("error") else "completed"
+            paper.triage_error = result.get("error")
+
+            if result.get("error"):
+                logger.error(f"  Relevance check failed; storing for retry: {paper.title[:60]}")
+                session.add(paper)
+                session.commit()
+                continue
 
             if not paper.is_relevant:
                 logger.info(f"  Not relevant (skip storing): {paper.title[:60]}")
@@ -131,6 +129,9 @@ def _run_ingestion(config: dict) -> tuple[int, int]:
 
 async def _run_analysis_async() -> int:
     """Download + analyze papers with relevance score >= threshold. Returns count of newly analyzed."""
+    from src.research_agent.acquisition.downloader import DownloadManager
+    from src.research_agent.agents.analysis.reviewer import PaperReviewer, ANALYSIS_MIN_SCORE
+
     reviewer = PaperReviewer()
     downloader = DownloadManager()
     analyzed = 0
@@ -158,6 +159,10 @@ async def _run_analysis_async() -> int:
                 )
                 if status != "downloaded":
                     logger.error(f"Download failed for {paper.id}, skipping.")
+                    paper.analysis_status = "failed"
+                    paper.analysis_error = "Download failed"
+                    session.add(paper)
+                    session.commit()
                     continue
                 paper.download_status = status
                 session.add(paper)
@@ -171,6 +176,8 @@ async def _run_analysis_async() -> int:
                         paper, full_content=paper.full_text_content
                     )
                 paper.analysis_report = report
+                paper.analysis_status = "completed"
+                paper.analysis_error = None
                 session.add(paper)
                 session.commit()
                 analyzed += 1

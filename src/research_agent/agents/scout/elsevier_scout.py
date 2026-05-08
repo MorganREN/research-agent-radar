@@ -4,13 +4,11 @@ import datetime as dt
 import os
 from dotenv import load_dotenv
 from loguru import logger
-import yaml
-from pathlib import Path
 from bs4 import BeautifulSoup
 
 load_dotenv()  # 从 .env 文件加载环境变量
 
-DEFAULT_Journals = [
+DEFAULT_JOURNALS = [
         # "Computer Networks",
         # "Ad Hoc Networks",
         # "Tunnelling and Underground Space Technology",
@@ -57,31 +55,36 @@ def parse_elsevier_xml_to_markdown(xml_content):
     return clean_markdown
 
 class ElsevierScout:
-    def __init__(self, max_results: int = 10, year: int = 2024):
+    def __init__(
+        self,
+        journals: list[str] | None = None,
+        max_results: int = 10,
+        year: int = 2024,
+    ):
         """
         journals: 目标期刊名称列表 (如 ["Computer Networks", "Ad Hoc Networks"])
         max_results: 每次搜索的最大结果数
         """
-        self.journals = None
+        self.journals = journals or DEFAULT_JOURNALS
         self.max_results = max_results
         self.year = year
         self.search_base_url = "https://api.elsevier.com/content/search/sciencedirect"
-        self.api_key = os.getenv("ELSEVIER_API_KEY_BACKUP")
+        self.api_key = os.getenv("ELSEVIER_API_KEY") or os.getenv("ELSEVIER_API_KEY_BACKUP")
         self.headers = {
             "X-ELS-APIKey": self.api_key,
             "Accept": "application/json"
         }
-        self.doi_list = []
-        self._load_journays()  # 加载期刊列表
+        self.papers: list[Paper] = []
 
     def _fetch_abstract_and_fulltext(self, doi: str) -> tuple[str | None, str | None]:
         """
         根据 DOI 获取论文的摘要和全文内容（如果可用）
         """
         base_url = f"https://api.elsevier.com/content/article/doi/{doi}"
+        params = {"view": "FULL"}
+        abstract = None
         # --- A. 获取 Abstract (JSON 格式) ---
         try:
-            params = {"view": "FULL"}
             json_headers = self.headers.copy()
             json_headers["Accept"] = "application/json"
             r_meta = requests.get(base_url, headers=json_headers, params=params)
@@ -94,6 +97,8 @@ class ElsevierScout:
                 else:
                     logger.warning(f"⚠️ No abstract found for DOI: {doi}, status code: {r_meta.status_code}")
                     abstract = None
+            else:
+                logger.warning(f"⚠️ No metadata found for DOI: {doi}, status code: {r_meta.status_code}")
         except Exception as e:
             logger.warning(f"⚠️ Exception while fetching abstract for DOI {doi}: {e}")
             abstract = None
@@ -125,6 +130,10 @@ class ElsevierScout:
             return [authors.get('$')]
 
     def _fetch_papers_from_journal(self, journal_name: str) -> list[Paper]:
+        if not self.api_key:
+            logger.error("Elsevier API key is missing. Set ELSEVIER_API_KEY in .env.")
+            return []
+
         query = {
             "query": f"SRCTITLE({journal_name}) AND PUBYEAR IS {self.year}",
             "count": self.max_results,
@@ -142,8 +151,13 @@ class ElsevierScout:
             for item in results:
                 # logger.info(f"Fetched abstract for DOI {item.get('dc:title')}:")
                 doi = item.get('prism:doi')
+                if not doi:
+                    continue
                 abstract, full_text_content = self._fetch_abstract_and_fulltext(doi)
-                date = dt.datetime.strptime(item.get('prism:coverDate'), "%Y-%m-%d")
+                cover_date = item.get('prism:coverDate')
+                if not cover_date:
+                    continue
+                date = dt.datetime.strptime(cover_date, "%Y-%m-%d")
                 if abstract: 
                     access_paper_count += 1
                 else:
@@ -152,12 +166,18 @@ class ElsevierScout:
                 authors = self._parse_authors(item.get('authors'))
                 if not authors:
                     continue
+                identifier = item.get('dc:identifier') or doi
+                links = item.get('link') or []
+                url = links[1].get('@href') if len(links) > 1 else item.get('prism:url')
+                title = item.get('dc:title')
+                if not title or not url:
+                    continue
                 paper = Paper(
-                    id=f"elsevier:{item.get('dc:identifier').split(':')[-1]}",
-                    title=item.get('dc:title'),
+                    id=f"elsevier:{identifier.split(':')[-1]}",
+                    title=title,
                     abstract=abstract,
                     authors=authors,
-                    url=item.get('link', [{}])[1].get('@href'),
+                    url=url,
                     published_date=date,
                     source=f"elsevier:{journal_name}",
                     is_oa=None,    # Elsevier 论文的开放获取状态需要额外判断
@@ -174,32 +194,13 @@ class ElsevierScout:
             logger.success(f"✅ Elsevier Scout: {journal_name}，找到 {len(papers)} 篇论文 | 开放获取论文数: {access_paper_count}, 非开放获取论文数: {non_access_paper_count}")
         return papers
 
-    def _load_journays(self):
-        # 这里可以实现从配置文件或数据库加载期刊列表的逻辑
-        config_path = Path(__file__).parent.parent.parent / "config" / "user_config.yaml"
-        try:
-            if config_path.exists():
-                with open(config_path, "r") as f:
-                    config = yaml.safe_load(f)
-                    if config and "journals" in config:
-                        self.journals = config.get("journals", [])
-                        logger.info("✅ Loaded journal list from user_config.yaml")
-                    else:
-                        logger.warning("⚠️ No 'journals' key found in user_config.yaml, using default journals")
-                        self.journals = DEFAULT_Journals
-            else:
-                logger.warning(f"⚠️ Config file not found at {config_path}, using default journals")
-                self.journals = DEFAULT_Journals
-        except Exception as e:
-            logger.warning(f"⚠️ Error loading config: {e}, using default journals")
-            self.journals = DEFAULT_Journals
-
-    def fetch_papers(self) -> set[Paper]:
+    def fetch_papers(self) -> list[Paper]:
+        self.papers = []
         for journal in self.journals:
             logger.info(f"🕵️ Scout 正在 Elsevier 搜索期刊: {journal} ...")
             papers = self._fetch_papers_from_journal(journal)
-            self.doi_list += papers
-        return list(self.doi_list)
+            self.papers += papers
+        return list(self.papers)
     
     
 

@@ -5,57 +5,48 @@ import os
 # 将项目根目录加入 python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-import yaml
 from pathlib import Path
 from loguru import logger
 import streamlit as st
 from src.research_agent.agents.prompt.prompt_agent import PromptAgent
+from src.research_agent.config.loader import (
+    ANALYSIS_PROMPT_FILE,
+    USER_CONFIG_FILE,
+    load_user_config,
+    save_analysis_prompt,
+    save_user_config,
+    user_config_exists,
+)
 
-CONFIG_DIR = Path(__file__).parent.parent / "research_agent" / "config"
-CONFIG_FILE = CONFIG_DIR / "user_config.yaml"
-PROMPT_FILE = CONFIG_DIR / "analysis_prompt.yaml"
+CONFIG_FILE = USER_CONFIG_FILE
+PROMPT_FILE = ANALYSIS_PROMPT_FILE
 
 def save_config(config: dict) -> bool:
     """Save configuration to YAML file"""
-    try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+    saved = save_user_config(config)
+    if saved:
         logger.info(f"✅ Configuration saved to {CONFIG_FILE}")
-        return True
-    except Exception as e:
-        logger.error(f"Error saving configuration: {e}")
-        return False
+    return saved
 
 def save_prompt_template(prompt_data: dict) -> bool:
     """Save generated prompt template to YAML file"""
-    try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        with open(PROMPT_FILE, "w", encoding="utf-8") as f:
-            yaml.dump(prompt_data, f, default_flow_style=False, allow_unicode=True)
+    saved = save_analysis_prompt(prompt_data)
+    if saved:
         logger.info(f"✅ Prompt template saved to {PROMPT_FILE}")
-        return True
-    except Exception as e:
-        logger.error(f"Error saving prompt template: {e}")
-        return False
+    return saved
 
 def load_config() -> dict:
     """Load configuration from YAML file"""
-    try:
-        if CONFIG_FILE.exists():
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                config = yaml.safe_load(f) or {}
-                logger.info(f"✅ Configuration loaded from {CONFIG_FILE}")
-                return config
-        logger.warning(f"⚠️ Config file not found at {CONFIG_FILE}")
-        return {}
-    except Exception as e:
-        logger.error(f"Error loading configuration: {e}")
-        return {}
+    config = load_user_config(with_defaults=False)
+    if config:
+        logger.info(f"✅ Configuration loaded from {CONFIG_FILE}")
+    else:
+        logger.warning(f"⚠️ Config file not found or empty at {CONFIG_FILE}")
+    return config
 
 def config_exists() -> bool:
     """Check if configuration file exists"""
-    return CONFIG_FILE.exists()
+    return user_config_exists()
 
 def get_config_path() -> Path:
     """Get the path to the config file"""

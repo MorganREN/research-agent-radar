@@ -169,6 +169,7 @@ class PDFUploadParser:
             source="uploaded_pdf",
             is_relevant=True,
             relevance_score=10,
+            triage_status="completed",
             download_status="downloaded",
             fetched_date=dt.datetime.now(dt.timezone.utc).replace(tzinfo=None),
         )

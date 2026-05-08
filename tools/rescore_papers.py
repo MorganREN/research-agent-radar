@@ -28,10 +28,12 @@ from sqlmodel import Session, select
 
 from src.research_agent.storage.models import Paper, engine, create_db_and_tables
 from src.research_agent.agents.filter.triage_agent import RelevanceFilter
+from src.research_agent.config.loader import load_user_config
 
 
 _WORKER_TRIAGE: RelevanceFilter | None = None
 _WORKER_DELAY: float = 0.0
+_WORKER_INTERESTS: list[str] = []
 
 
 def _fmt_bar(current: int, total: int, width: int = 30) -> str:
@@ -41,9 +43,10 @@ def _fmt_bar(current: int, total: int, width: int = 30) -> str:
     return f"[{bar}] {current}/{total} ({pct}%)"
 
 
-def _init_worker(request_delay: float) -> None:
-    global _WORKER_TRIAGE, _WORKER_DELAY
-    _WORKER_TRIAGE = RelevanceFilter(research_interests="")
+def _init_worker(request_delay: float, interests: list[str]) -> None:
+    global _WORKER_TRIAGE, _WORKER_DELAY, _WORKER_INTERESTS
+    _WORKER_INTERESTS = interests
+    _WORKER_TRIAGE = RelevanceFilter(research_interests=_WORKER_INTERESTS)
     _WORKER_DELAY = max(0.0, request_delay)
 
 
@@ -77,7 +80,7 @@ def _score_with_triage(
 def _score_one_mp(paper_item: tuple[str, str, str | None, int | None]) -> dict[str, Any]:
     global _WORKER_TRIAGE, _WORKER_DELAY
     if _WORKER_TRIAGE is None:
-        _WORKER_TRIAGE = RelevanceFilter(research_interests="")
+        _WORKER_TRIAGE = RelevanceFilter(research_interests=_WORKER_INTERESTS)
     return _score_with_triage(_WORKER_TRIAGE, paper_item, _WORKER_DELAY)
 
 
@@ -85,9 +88,10 @@ def _iter_scores(
     paper_items: list[tuple[str, str, str | None, int | None]],
     workers: int,
     request_delay: float,
+    interests: list[str],
 ):
     if workers <= 1:
-        triage = RelevanceFilter(research_interests="")
+        triage = RelevanceFilter(research_interests=interests)
         for item in paper_items:
             yield _score_with_triage(triage, item, request_delay)
         return
@@ -96,7 +100,7 @@ def _iter_scores(
     with ctx.Pool(
         processes=workers,
         initializer=_init_worker,
-        initargs=(request_delay,),
+        initargs=(request_delay, interests),
     ) as pool:
         for result in pool.imap_unordered(_score_one_mp, paper_items, chunksize=1):
             yield result
@@ -120,9 +124,10 @@ def rescore(
     total = len(papers)
     workers = max(1, workers)
     paper_items = [(p.id, p.title, p.abstract, p.relevance_score) for p in papers]
+    interests = load_user_config().get("fields", [])
 
     logger.info(f"Starting re-scoring for {total} papers...")
-    triage_for_log = RelevanceFilter(research_interests="")
+    triage_for_log = RelevanceFilter(research_interests=interests)
     logger.info(f"  Workers: {workers}")
     logger.info(f"  Request delay per worker: {request_delay:.2f}s")
     logger.info(f"  Research interests ({len(triage_for_log.interest_items)} items):")
@@ -141,7 +146,15 @@ def rescore(
     updates_payload: dict[str, tuple[int, bool, str]] = {}
     results_by_id: dict[str, dict[str, Any]] = {}
 
-    for idx, result in enumerate(_iter_scores(paper_items, workers=workers, request_delay=request_delay), 1):
+    for idx, result in enumerate(
+        _iter_scores(
+            paper_items,
+            workers=workers,
+            request_delay=request_delay,
+            interests=interests,
+        ),
+        1,
+    ):
         print(f"\r  {_fmt_bar(idx, total)}  ", end="", flush=True)
         paper_id = result["paper_id"]
         results_by_id[paper_id] = result
@@ -176,6 +189,8 @@ def rescore(
                 db_paper.relevance_score = new_score
                 db_paper.is_relevant = is_relevant
                 db_paper.relevance_reason = reason
+                db_paper.triage_status = "completed"
+                db_paper.triage_error = None
                 session.add(db_paper)
 
             if delete_irrelevant:

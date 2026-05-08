@@ -334,7 +334,7 @@ update_frequency: Every 24 hours
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `KIMI_API_KEY` | ✅ Yes | Moonshot AI API key for Kimi K2.5 (analysis & PDF parsing) |
-| `QWEN_API_KEY` | ✅ Yes | Dashscope API key for Qwen-Plus (relevance filtering & prompt generation) |
+| `QWEN_API_KEY` or `BOB_API_KEY` | ✅ Yes | Qwen-compatible API key for relevance filtering & prompt generation |
 | `ELSEVIER_API_KEY` | ❌ Optional | Elsevier API key for ScienceDirect access |
 
 ---
@@ -361,6 +361,7 @@ update_frequency: Every 24 hours
 |---------|-------------|
 | `poetry run radar` | 🔄 Start the scheduler daemon (recurring pipeline runs) |
 | `poetry run radar --once` | ▶️ Run the pipeline once and exit |
+| `poetry run doctor` | 🩺 Check dependencies, imports, config, and key environment variables |
 | `poetry run streamlit run src/dashboard/app.py` | 🖥️ Launch the Streamlit dashboard |
 | `python tools/check.py` | 🔎 Inspect all papers in the database |
 

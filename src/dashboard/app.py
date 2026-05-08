@@ -40,11 +40,19 @@ insights_page = st.Page("pages/insights.py", title="Insights")
 # ============================
 pg = st.navigation([library_page, pipeline_page, insights_page], position="hidden")
 
+
+def _current_page_title() -> str:
+    """Return selected page title, with a safe fallback for bare import checks."""
+    try:
+        return pg.title
+    except AttributeError:
+        return "Library"
+
 # ============================
 # Shared CSS + Top Navbar (appears on ALL pages)
 # ============================
 inject_css()
-st.markdown(render_top_navbar(current_page_title=pg.title), unsafe_allow_html=True)
+st.markdown(render_top_navbar(current_page_title=_current_page_title()), unsafe_allow_html=True)
 
 # ============================
 # Run Selected Page

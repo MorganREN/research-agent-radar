@@ -33,6 +33,7 @@ dependencies = [
 [project.scripts]
 radar = "src.run:main"
 rescore = "tools.rescore_papers:main"
+doctor = "tools.doctor:main"
 
 [tool.poetry]
 packages = [{include = "src"}, {include = "tools"}]

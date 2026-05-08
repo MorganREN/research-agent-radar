@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Delete all papers with relevance_score == 2.
+"""Delete all papers with a target relevance score.
 
 Usage:
-    python tools/delete_score_2_papers.py
-    python tools/delete_score_2_papers.py --dry-run
+    python tools/delete_score_2_papers.py --score 2
+    python tools/delete_score_2_papers.py --score 2 --dry-run
 """
 
 import os
@@ -18,23 +18,24 @@ from sqlmodel import Session, select
 from src.research_agent.storage.models import Paper, engine, create_db_and_tables
 
 
-TARGET_SCORE = 2
-
-
-def delete_score_2_papers(dry_run: bool = False, preview_limit: int = 30) -> int:
+def delete_papers_by_score(
+    target_score: int,
+    dry_run: bool = False,
+    preview_limit: int = 30,
+) -> int:
     create_db_and_tables()
 
     with Session(engine) as session:
         target_papers = session.exec(
-            select(Paper).where(Paper.relevance_score == TARGET_SCORE)
+            select(Paper).where(Paper.relevance_score == target_score)
         ).all()
 
         total = len(target_papers)
         if total == 0:
-            logger.info(f"No papers found with relevance_score == {TARGET_SCORE}.")
+            logger.info(f"No papers found with relevance_score == {target_score}.")
             return 0
 
-        logger.info(f"Found {total} papers with relevance_score == {TARGET_SCORE}.")
+        logger.info(f"Found {total} papers with relevance_score == {target_score}.")
 
         if dry_run:
             logger.warning("DRY-RUN mode: no rows will be deleted.")
@@ -50,13 +51,24 @@ def delete_score_2_papers(dry_run: bool = False, preview_limit: int = 30) -> int
             session.delete(paper)
 
         session.commit()
-        logger.success(f"Deleted {total} papers with relevance_score == {TARGET_SCORE}.")
+        logger.success(f"Deleted {total} papers with relevance_score == {target_score}.")
         return total
+
+
+def delete_score_2_papers(dry_run: bool = False, preview_limit: int = 30) -> int:
+    """Backward-compatible helper for the original score-2 cleanup script."""
+    return delete_papers_by_score(2, dry_run=dry_run, preview_limit=preview_limit)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Delete all papers with relevance_score == 2 from the database."
+        description="Delete all papers with a given relevance_score from the database."
+    )
+    parser.add_argument(
+        "--score",
+        type=int,
+        default=2,
+        help="Target relevance score to delete (default: 2).",
     )
     parser.add_argument(
         "--dry-run",
@@ -71,7 +83,11 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    delete_score_2_papers(dry_run=args.dry_run, preview_limit=args.preview_limit)
+    delete_papers_by_score(
+        target_score=args.score,
+        dry_run=args.dry_run,
+        preview_limit=args.preview_limit,
+    )
 
 
 if __name__ == "__main__":

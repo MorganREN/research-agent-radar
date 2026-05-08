@@ -137,6 +137,7 @@ celerybeat.pid
 # Environments
 .env
 .envrc
+.conda/
 .venv
 env/
 venv/
@@ -190,6 +191,14 @@ cython_debug/
 
 # Ruff stuff:
 .ruff_cache/
+
+# Project runtime state
+database.db
+data/
+logs/
+pids/
+src/research_agent/config/user_config.yaml
+src/research_agent/config/analysis_prompt.yaml
 
 # PyPI configuration file
 .pypirc
